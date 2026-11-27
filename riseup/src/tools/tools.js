@@ -87,6 +87,7 @@
         textRulesJs: await ownFile('src/shared/textRules.js'),
         componentsJs: await ownFile('src/shared/components.js'),
         navJs: await ownFile('src/shared/nav.js'),
+        courseJs: await ownFile('src/shared/course.js'),
         componentsMoreJs: await ownFile('src/shared/components-more.js'),
         componentsExtraJs: await ownFile('src/shared/components-extra.js'),
         componentsLayoutJs: await ownFile('src/shared/components-layout.js'),

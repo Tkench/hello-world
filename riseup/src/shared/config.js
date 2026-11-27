@@ -46,6 +46,7 @@
       animation: { type: 'none', duration: 700 }, // scroll animation for blocks
       navigation: { layout: 'rise', style: 'light', progress: true, logo: '', title: '' }, // see nav.js
       widget: { enabled: false, tools: { score: true }, title: '' }, // floating space, see widget.js
+      startPage: { enabled: false, style: 'photo', eyebrow: '', title: '', subtitle: '', image: '', logo: '', bullets: '', duration: '', buttonText: 'Start course', startAt: '1' }, // see course.js
     };
   }
 
@@ -63,6 +64,7 @@
     out.componentTheme.bg = Object.assign({}, out.componentTheme.bg);
     out.animation = Object.assign(base.animation, (cfg && cfg.animation) || {});
     out.navigation = Object.assign(base.navigation, (cfg && cfg.navigation) || {});
+    out.startPage = Object.assign(base.startPage, (cfg && cfg.startPage) || {});
     out.widget = Object.assign(base.widget, (cfg && cfg.widget) || {});
     // Older settings chose one tool with `type`.
     if (cfg && cfg.widget && !cfg.widget.tools && cfg.widget.type) out.widget.tools = { [cfg.widget.type]: true };

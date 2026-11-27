@@ -22,6 +22,7 @@ Before building, Rise's current features were checked (November 2026) so RiseUp 
 | Layout and reveal | Tabs, accordion, labelled graphic, process | **Tabs** (underline, pills, side), **Click to reveal** (cards, numbered, minimal), **Interactive timeline** (horizontal points, expanding cards, stepper), **Scratch card**, **Labelled graphic** (text tags, numbered list, drag to points, drag to areas), **Text with definitions** (hover definitions and pop-up links), **Click-to-reveal checklist**, **Card layout** (2 or 3 columns or rows, images, looping video, tags, bullets, link or pop-up buttons) |
 | Backgrounds | Block background colours | **Block backgrounds** for every RiseUp block (image or colour, overlay, inside the column or full width, padding, parallax), with a course default; **Course background**: one image fixed behind the whole course while learners scroll, with blocks frosted, solid, or seamless (no block backgrounds at all, Rise's or RiseUp's, with text switching to white on dark overlays) |
 | Floating space | None | Optional draggable dock with tabs for a **score**, a **collection**, a **lesson menu**, a **notepad** (downloads as a PDF) and a **checklist**; progress kept on the learner's device |
+| Course structure | Cover page with lesson list | **Course menu** block (numbered tiles, tall panels, list with progress ring, tiles over an image): sections ticked off as learners finish them, optional locking in order, and a "Section complete / Back to menu" banner at the end of each section; **custom start page** replacing Rise's cover (photo, split or bold designs, title, subtitle, "what you'll learn", duration, logo, Start and Continue) |
 | Navigation | Left sidebar menu | Optional top bar (lessons across the top, Lessons dropdown when there are many) or top bar with a full-screen numbered menu; light, dark or course-colour; logo, title and progress line. Built from Rise's lesson links; leaves the course unchanged if it can't find them |
 | Animation | None | Blocks fade, rise, zoom or slide in as learners scroll; respects the device's reduced-motion setting |
 
@@ -58,6 +59,7 @@ The interface follows the Omniplex Learning brand guidelines: Dark grey surfaces
 - `src/shared/components-more.js`: the later blocks (sorting, gap fill, pop-up, collectable, torch, blender, conversation, data story) and learner progress.
 - `src/shared/components-extra.js`: the third set of blocks and the small PDF writer used for notes.
 - `src/shared/components-layout.js`: the fourth set of blocks (tabs, reveal, timelines, scratch card, labelled graphic, definitions, card layout).
+- `src/shared/course.js`: the course menu block, lesson completion tracking, section-end banners and the custom start page.
 - `src/shared/widget.js`: the floating space.
 - `src/shared/components.js`: the blocks: form schema, defaults, rendering and styles for each type. Author text is always inserted as text, never HTML.
 - `src/runtime/riseup-runtime.js`: the script added to published courses (and run in Rise's Preview). It swaps block codes for blocks, runs scroll animations and applies text styles as Rise renders each lesson.

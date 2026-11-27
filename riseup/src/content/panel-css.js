@@ -143,6 +143,10 @@ details.acc .item { background: var(--bg); }
 .preview .ru-bleed { width: auto !important; margin-left: 0 !important; border-radius: var(--ru-radius) !important; }
 .preview-label { position: sticky; top: -14px; z-index: 5; display: block; margin: -14px -14px 10px; padding: 4px 10px; background: #f5f5f5; color: #393939; font: 700 10px/1.6 "RiseUp Poppins", Poppins, sans-serif; text-transform: uppercase; letter-spacing: .1em; }
 .preview.pickable .ru-hs-stage { cursor: crosshair; }
+.preview-start { padding: 0; overflow: hidden; }
+.preview-start .preview-label { position: absolute; top: 0; left: 0; right: 0; margin: 0; z-index: 3; }
+.preview .ru-c.ru-sp { position: relative; inset: auto; min-height: 300px; font-size: 7.5px; animation: none; z-index: 1; }
+.preview .ru-c.ru-sp .ru-sp-copy { padding: 34px 26px 26px; }
 .listfield { margin: 10px 0; }
 .listfield > .lf-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-weight: 700; color: var(--fg); }
 .lf-item { padding: 8px 12px 10px; border-radius: 10px; background: var(--surface); margin-bottom: 6px; }

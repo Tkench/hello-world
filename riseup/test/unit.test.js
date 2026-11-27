@@ -1059,3 +1059,106 @@ test('seamless course background: no block backgrounds, readable text', () => {
   assert.match(dark, /\[data-block-id\] p,[^{]*\{ color: #ffffff !important; \}/, 'Rise text turns white');
   assert.match(dark, /--ru-ink: #ffffff !important/, 'RiseUp text turns white');
 });
+
+// ------------------------------------------------------------------ course menu and start page
+const course = require('../src/shared/course.js');
+const COURSE_PAGE = (body) => `<!doctype html><html><head><title>Fire Safety Basics</title></head><body>
+  <aside class="nav-sidebar"><a href="#/lessons/m">Menu</a><a href="#/lessons/a">Hazards</a><a href="#/lessons/b">Near misses</a><a href="#/lessons/c">Reporting</a></aside>
+  <main>${body || ''}</main></body></html>`;
+
+function fakeIO(win) {
+  const all = [];
+  win.IntersectionObserver = class { constructor(cb) { this.cb = cb; this.els = []; all.push(this); } observe(e) { this.els.push(e); } unobserve() {} disconnect() { this.els = []; } };
+  return () => all.forEach((o) => o.els.length && o.cb(o.els.map((target) => ({ target, isIntersecting: true }))));
+}
+
+test('lessons resolve by number or title, and sections cover a range', () => {
+  const dom = new JSDOM(COURSE_PAGE(), { url: 'https://lms.example/c/index.html#/' });
+  const lessons = navLib.collectLessons(dom.window.document);
+  assert.equal(course.resolveLesson(lessons, '2').title, 'Hazards');
+  assert.equal(course.resolveLesson(lessons, 'near MISSES').id, 'b');
+  assert.equal(course.resolveLesson(lessons, '9'), null);
+  assert.deepEqual(course.sectionLessons(lessons, { first: '2', last: 'Near misses' }).map((l) => l.id), ['a', 'b']);
+  assert.deepEqual(course.sectionLessons(lessons, { first: '4' }).map((l) => l.id), ['c']);
+});
+
+test('course menu links to sections, ticks finished ones and can lock in order', () => {
+  const dom = new JSDOM(COURSE_PAGE(), { url: 'https://lms.example/c/index.html#/lessons/m', pretendToBeVisual: true });
+  const doc = dom.window.document;
+  const data = { title: 'Menu', style: 'tiles', sequential: true, sections: [{ title: 'One', first: '2', last: '3' }, { title: 'Two', first: '4', last: '4' }] };
+  more.progress.update(dom.window, 'ck-menu', (p) => { p.lessonsDone = { a: 1 }; });
+  const node = comps.renderComponent(doc, { id: 'cm', type: 'coursemenu', data }, { courseKey: 'ck-menu' });
+  doc.querySelector('main').appendChild(node);
+  const items = node.querySelectorAll('.ru-cm-item');
+  assert.equal(items[0].getAttribute('href'), '#/lessons/b', 'continues at the first unfinished lesson');
+  assert.match(items[0].textContent, /In progress · 1 of 2/);
+  assert.equal(items[1].tagName, 'DIV', 'locked until section one is done');
+  assert.match(items[1].className, /is-locked/);
+  assert.equal(more.progress.read(dom.window, 'ck-menu').menuHash, '#/lessons/m', 'remembers where the menu is');
+  more.progress.update(dom.window, 'ck-menu', (p) => { p.lessonsDone.b = 1; });
+  doc.dispatchEvent(new dom.window.CustomEvent('riseup:lessondone', { detail: { id: 'b' } }));
+  const again = node.querySelectorAll('.ru-cm-item');
+  assert.match(again[0].className, /is-complete/);
+  assert.equal(again[0].querySelector('.ru-cm-num').textContent, '✓');
+  assert.equal(again[1].getAttribute('href'), '#/lessons/c', 'next section unlocks');
+  assert.match(node.querySelector('.ru-cm-count').textContent, /1 of 2 sections complete/);
+});
+
+test('finishing a section\'s last lesson offers a way back to the menu', () => {
+  const blocks = '<section data-block-id="x1"><p>One</p></section><section data-block-id="x2"><p>End</p></section>';
+  const dom = new JSDOM(COURSE_PAGE(blocks), { url: 'https://lms.example/c/index.html#/lessons/c', pretendToBeVisual: true });
+  const win = dom.window;
+  const trigger = fakeIO(win);
+  more.progress.update(win, 'ck-se', (p) => { p.menuHash = '#/lessons/m'; });
+  const comps2 = [{ id: 'cm', type: 'coursemenu', data: { sections: [{ title: 'Reporting', first: '4', last: '4' }] } }];
+  const rt = course.startCourse(win.document, { components: comps2 }, { courseKey: 'ck-se' });
+  rt.refresh();
+  assert.equal(win.document.querySelector('.ru-se'), null, 'nothing until the end is reached');
+  trigger();
+  const banner = win.document.querySelector('.ru-se');
+  assert.ok(banner, 'banner shown');
+  assert.match(banner.textContent, /Section complete: Reporting/);
+  assert.equal(banner.querySelector('a').getAttribute('href'), '#/lessons/m');
+  assert.equal(banner.previousElementSibling.getAttribute('data-block-id'), 'x2', 'placed after the last block');
+  assert.ok(more.progress.read(win, 'ck-se').lessonsDone.c);
+  rt.stop();
+});
+
+test('custom start page replaces the cover, starts the course, and offers Continue', () => {
+  const dom = new JSDOM(COURSE_PAGE(), { url: 'https://lms.example/c/index.html#/', pretendToBeVisual: true });
+  const win = dom.window;
+  const doc = win.document;
+  const sp = { enabled: true, style: 'split', eyebrow: 'Module 1', subtitle: 'Fifteen minutes', bullets: '- Spot hazards\n- Report them', buttonText: 'Begin', startAt: 'Menu' };
+  const rt = course.startCourse(doc, { startPage: sp, components: [] }, { courseKey: 'ck-sp' });
+  const page = doc.querySelector('.ru-sp');
+  assert.ok(page && page.classList.contains('ru-sp-split'));
+  assert.equal(page.querySelector('h1').textContent, 'Fire Safety Basics', 'course title by default');
+  assert.equal(page.querySelectorAll('.ru-sp-list li').length, 2);
+  page.querySelector('.ru-sp-start').click();
+  assert.equal(win.location.hash, '#/lessons/m', 'starts at the chosen lesson');
+  win.dispatchEvent(new win.HashChangeEvent('hashchange'));
+  assert.equal(doc.querySelector('.ru-sp'), null, 'hidden on lessons');
+  // a returning learner
+  more.progress.update(win, 'ck-sp', (p) => { p.lessonsDone = { m: 1 }; p.lastLesson = '#/lessons/b'; });
+  win.location.hash = '#/';
+  win.dispatchEvent(new win.HashChangeEvent('hashchange'));
+  const back = doc.querySelector('.ru-sp');
+  assert.match(back.querySelector('.ru-sp-start').textContent, /Continue/);
+  back.querySelector('.ru-sp-start').click();
+  assert.equal(win.location.hash, '#/lessons/b');
+  rt.stop();
+});
+
+test('older settings gain a start page that is off', () => {
+  const c = config.normalizeCourseConfig({});
+  assert.equal(c.startPage.enabled, false);
+  assert.equal(c.startPage.startAt, '1');
+});
+
+test('no stray "null" text in any course menu style', () => {
+  const dom = new JSDOM(COURSE_PAGE(), { url: 'https://lms.example/c/index.html#/lessons/m', pretendToBeVisual: true });
+  for (const style of ['tiles', 'panels', 'list', 'image']) {
+    const node = comps.renderComponent(dom.window.document, { id: 'n' + style, type: 'coursemenu', data: { style, sections: [{ title: 'One', first: '2' }] } }, { courseKey: 'k', static: true });
+    assert.doesNotMatch(node.textContent, /null|undefined/, style);
+  }
+});

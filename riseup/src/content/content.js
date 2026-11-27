@@ -304,6 +304,7 @@
     richtext: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 4h12M2 7.5h5M2 11h12"/><path d="M8.5 7.5h5" stroke-dasharray="1.4 1.2"/></svg>',
     revealcheck: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="2" y="3" width="3.5" height="3.5" rx=".8"/><rect x="2" y="9.5" width="3.5" height="3.5" rx=".8"/><path d="M8 4.75h6M10.5 11.25h1" stroke-linecap="round"/></svg>',
     cards: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="1.5" y="3" width="5.5" height="10" rx="1"/><rect x="9" y="3" width="5.5" height="10" rx="1"/><path d="M1.5 7h5.5M9 7h5.5"/></svg>',
+    coursemenu: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><path d="M9.5 11.5l1.3 1.3 2.7-2.8" stroke-linecap="round"/></svg>',
     hotspots: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2.5" width="12" height="11" rx="2"/><circle cx="6" cy="7" r="1.5" fill="currentColor"/><circle cx="10.5" cy="9.5" r="1.5" fill="currentColor"/></svg>',
     sort: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 4h7M6 8h7M6 12h7M3 3.5v9M2 11l1 1.5L4 11"/></svg>',
     reveal: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/></svg>',
@@ -395,6 +396,7 @@
         field('Shadow', selectInput(gs.blockShadow, [['none', 'None'], ['soft', 'Soft'], ['medium', 'Medium'], ['strong', 'Strong']], set('blockShadow'))),
         field('Image corner radius', numberInput(gs.imageRadius, set('imageRadius'), { min: 0, max: 64 })),
       ]),
+      acc(T, 'start', 'Start page', startPageSection()),
       acc(T, 'pagebg', 'Course background', [
         h('p', { class: 'empty' }, 'One image fixed behind the whole course. It stays still as learners scroll. Shows in Preview and the published course.'),
         field('Image', imageInput(gs.pageImage, (v) => { gs.pageImage = v; saveConfig(); }), 'stack'),
@@ -446,6 +448,43 @@
         h('textarea', { class: 'code', spellcheck: false, value: gs.customCss || '', 'aria-label': 'Custom CSS', placeholder: '/* Applied in the editor and the published course */', oninput: (e) => set('customCss')(e.target.value) }),
       ]),
     ];
+  }
+
+  /** Settings for the custom start page, with a live preview. */
+  function startPageSection() {
+    const sp = state.config.startPage;
+    const set = (k, rerender) => (v) => { sp[k] = v; saveConfig(); if (rerender) panel.render(); else drawPreview(); };
+    const box = h('div', { class: 'preview preview-start' });
+    function drawPreview() {
+      const title = state.config.courseTitle || courseTitleGuess();
+      const built = RU.startPageEl(document, sp, { courseTitle: title });
+      const theme = Object.assign({}, state.config.componentTheme);
+      if (state.config.componentTheme.matchCourse !== false) {
+        const look = RU.detectCourseTheme(document, null);
+        delete look.dark; delete look.ink;
+        RU.applyCourseTheme(built.page, look, { keepAccent: Boolean(theme.accent) });
+      }
+      box.replaceChildren(h('span', { class: 'preview-label' }, 'Preview'), built.page);
+    }
+    const out = [
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: Boolean(sp.enabled), onchange: (e) => { sp.enabled = e.target.checked; saveConfig(); panel.render(); } }), 'Replace Rise\u2019s cover page with this start page'),
+    ];
+    if (!sp.enabled) return out.concat([h('p', { class: 'empty' }, 'A hero-style first page with the course title and a Start button. Shows in Preview and the published course.')]);
+    drawPreview();
+    return out.concat([
+      box,
+      field('Design', selectInput(sp.style, Object.entries(RU.START_STYLES), set('style'))),
+      field('Small heading', h('input', { type: 'text', value: sp.eyebrow || '', placeholder: 'eg Module 1', oninput: (e) => set('eyebrow')(e.target.value) }), 'stack'),
+      field('Title', h('input', { type: 'text', value: sp.title || '', placeholder: 'The course title', oninput: (e) => set('title')(e.target.value) }), 'stack'),
+      field('Subtitle', h('textarea', { value: sp.subtitle || '', rows: 2, oninput: (e) => set('subtitle')(e.target.value) }), 'stack'),
+      field('What you\u2019ll learn (one per line, optional)', h('textarea', { value: sp.bullets || '', rows: 3, oninput: (e) => set('bullets')(e.target.value) }), 'stack'),
+      field('Image', imageInput(sp.image, (v) => { sp.image = v; saveConfig(); }), 'stack'),
+      field('Logo', imageInput(sp.logo, (v) => { sp.logo = v; saveConfig(); }), 'stack'),
+      field('Duration (optional)', h('input', { type: 'text', value: sp.duration || '', placeholder: 'eg 15 minutes', oninput: (e) => set('duration')(e.target.value) })),
+      field('Button text', h('input', { type: 'text', value: sp.buttonText || '', placeholder: 'Start course', oninput: (e) => set('buttonText')(e.target.value) })),
+      field('Start at lesson', h('input', { type: 'text', value: sp.startAt || '1', placeholder: '1, or a lesson title', oninput: (e) => set('startAt')(e.target.value) })),
+      h('p', { class: 'empty' }, 'Learners coming back see Continue, which takes them to where they left off. Using a course menu? Put its lesson number or title in Start at lesson.'),
+    ]);
   }
 
   // ================================================================ Text tab

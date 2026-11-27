@@ -140,6 +140,7 @@
         animateBlocks();
         if (o.textRules !== false) RU.wrapTextRules(doc.body, cfg.textRules || [], cfg.textStyles || [], { skipEditable: true });
         if (nav) nav.refresh();
+        if (course) course.refresh();
       } finally {
         observer.observe(doc.body, { childList: true, subtree: true, characterData: true });
       }
@@ -161,6 +162,17 @@
         },
       });
     }
+    var hasMenu = (cfg.components || []).some(function (c) { return c.type === 'coursemenu'; });
+    var course = (RU.startCourse && ((cfg.startPage && cfg.startPage.enabled) || hasMenu))
+      ? RU.startCourse(doc, { startPage: cfg.startPage, components: cfg.components || [] }, {
+        courseKey: courseKey(),
+        applyLook: function (n) {
+          var look = matchCourse ? RU.detectCourseTheme(doc, null) : {};
+          delete look.dark; delete look.ink;
+          RU.applyCourseTheme(n, look, { keepAccent: Boolean(cfg.componentTheme && cfg.componentTheme.accent) });
+        },
+      })
+      : null;
     var widget = (RU.startWidget && cfg.widget && cfg.widget.enabled)
       ? RU.startWidget(doc, cfg.widget, { courseKey: courseKey(), components: cfg.components || [] })
       : null;
@@ -172,6 +184,7 @@
       stop: function () {
         observer.disconnect();
         if (nav) nav.stop();
+        if (course) course.stop();
         if (widget) widget.stop();
         if (io) io.disconnect();
         mounted.forEach(function (m) {

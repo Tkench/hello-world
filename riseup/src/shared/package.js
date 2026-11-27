@@ -45,6 +45,7 @@
       '<script src="riseup/components-extra.js"></script>',
       '<script src="riseup/components-layout.js"></script>',
       '<script src="riseup/nav.js"></script>',
+      '<script src="riseup/course.js"></script>',
       '<script src="riseup/widget.js"></script>',
       '<script src="riseup/riseup-runtime.js"></script>',
       END].join('\n');
@@ -62,6 +63,7 @@
       animation: config.animation || { type: 'none' },
       navigation: config.navigation || { layout: 'rise' },
       widget: config.widget || { enabled: false },
+      startPage: config.startPage || { enabled: false },
       blockSelector: deps.SELECTORS.block,
     };
   }
@@ -102,7 +104,7 @@
       }
       return v;
     };
-    const config = Object.assign({}, rtConfig, { components: walk(rtConfig.components || []), navigation: walk(rtConfig.navigation || { layout: 'rise' }), componentTheme: walk(rtConfig.componentTheme || {}) });
+    const config = Object.assign({}, rtConfig, { components: walk(rtConfig.components || []), navigation: walk(rtConfig.navigation || { layout: 'rise' }), componentTheme: walk(rtConfig.componentTheme || {}), startPage: walk(rtConfig.startPage || { enabled: false }) });
     return { config, files };
   }
 
@@ -144,6 +146,7 @@
     zip.file(dir + 'riseup/text-rules.js', assets.textRulesJs);
     zip.file(dir + 'riseup/components.js', assets.componentsJs || '');
     zip.file(dir + 'riseup/nav.js', assets.navJs || '');
+    zip.file(dir + 'riseup/course.js', assets.courseJs || '');
     zip.file(dir + 'riseup/components-more.js', assets.componentsMoreJs || '');
     zip.file(dir + 'riseup/components-extra.js', assets.componentsExtraJs || '');
     zip.file(dir + 'riseup/components-layout.js', assets.componentsLayoutJs || '');
