@@ -133,7 +133,11 @@
   function pageBackgroundCss(gs, editor, opts) {
     const url = safeCssUrl((opts && opts.pageImageUrl) || gs.pageImage);
     if (!url || editor) return '';
-    const tint = { light: 'rgba(255,255,255,.55)', dark: 'rgba(8,10,16,.55)' }[gs.pageOverlay] || '';
+    const seamless = gs.pageBlocks === 'clear';
+    // With no block backgrounds the overlay does all the work of keeping text readable.
+    const tint = (seamless
+      ? { light: 'rgba(255,255,255,.78)', dark: 'rgba(8,10,16,.68)' }
+      : { light: 'rgba(255,255,255,.55)', dark: 'rgba(8,10,16,.55)' })[gs.pageOverlay] || '';
     const layers = (tint ? 'linear-gradient(' + tint + ', ' + tint + '), ' : '') + "url('" + url + "')";
     const out = [
       'html, body { background: transparent !important; }',
@@ -143,8 +147,16 @@
     const blocks = SELECTORS.block + ', .lesson-header'; // the lesson title banner gets the same treatment
     if (gs.pageBlocks === 'frosted' || !gs.pageBlocks) {
       out.push(blocks + ' { background-color: rgba(255,255,255,.82) !important; -webkit-backdrop-filter: blur(8px) saturate(1.2); backdrop-filter: blur(8px) saturate(1.2); }');
-    } else if (gs.pageBlocks === 'clear') {
-      out.push(blocks + ' { background: transparent !important; }');
+    } else if (seamless) {
+      // Seamless: no block backgrounds, shadows or borders anywhere, Rise's or RiseUp's.
+      out.push(blocks + ' { background: transparent !important; box-shadow: none !important; border-color: transparent !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }');
+      if (gs.pageOverlay === 'dark') {
+        const text = SELECTORS.block.split(',').map((b) => b.trim()).flatMap((b) => ['p', 'li', 'h1', 'h2', 'h3', 'h4', 'blockquote', 'figcaption', 'td', 'th'].map((t) => b + ' ' + t)).join(', ');
+        out.push(text + ', .lesson-header__title, .lesson-header { color: #ffffff !important; }');
+        out.push('.ru-c:not(.ru-has-bg) { --ru-ink: #ffffff !important; --ru-muted: rgba(255,255,255,.78) !important; --ru-line: rgba(255,255,255,.28) !important; --ru-soft: rgba(255,255,255,.08) !important; --ru-card: rgba(255,255,255,.12) !important; --ru-accent-text: color-mix(in srgb, var(--ru-accent) 40%, #ffffff); color: #ffffff; }');
+      } else {
+        out.push('.ru-c:not(.ru-has-bg) { --ru-soft: rgba(255,255,255,.4) !important; --ru-card: rgba(255,255,255,.62) !important; --ru-line: rgba(29,35,48,.16) !important; }');
+      }
     }
     return out.join('\n');
   }

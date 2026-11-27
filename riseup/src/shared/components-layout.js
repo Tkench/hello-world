@@ -645,7 +645,7 @@
 .ru-c .ru-tabs-list { display: flex; gap: 4px; flex-wrap: wrap; }
 .ru-c .ru-tabs-tab { padding: 12px 18px; border: 0; background: none; color: var(--ru-muted); font: inherit; font-weight: 700; cursor: pointer; border-radius: 10px 10px 0 0; position: relative; }
 .ru-c .ru-tabs-tab:hover { color: var(--ru-ink); }
-.ru-c .ru-tabs-tab[aria-selected="true"] { color: var(--ru-accent); }
+.ru-c .ru-tabs-tab[aria-selected="true"] { color: var(--ru-accent-text, var(--ru-accent)); }
 .ru-c .ru-tabs-underline .ru-tabs-list { border-bottom: 2px solid var(--ru-line); }
 .ru-c .ru-tabs-underline .ru-tabs-tab[aria-selected="true"]::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: -2px; height: 4px; border-radius: 4px 4px 0 0; background: var(--ru-accent); }
 .ru-c .ru-tabs-panel { padding: 22px 4px 6px; display: flex; gap: 22px; align-items: flex-start; animation: ru-in .3s ease; outline: none; }
@@ -673,7 +673,7 @@
 .ru-c .ru-acc-icon::before, .ru-c .ru-acc-icon::after { content: ""; position: absolute; left: 6px; right: 6px; top: 10px; height: 2px; background: var(--ru-accent-ink); transition: transform .25s; }
 .ru-c .ru-acc-icon::after { transform: rotate(90deg); }
 .ru-c [aria-expanded="true"] > .ru-acc-icon::after { transform: rotate(0); }
-.ru-c .ru-acc-num { font: 900 1.4em/1 var(--ru-heading-font, inherit); color: var(--ru-accent); min-width: 1.6em; }
+.ru-c .ru-acc-num { font: 900 1.4em/1 var(--ru-heading-font, inherit); color: var(--ru-accent-text, var(--ru-accent)); min-width: 1.6em; }
 .ru-c .ru-acc-inner { padding: 0 18px 18px; display: flex; flex-direction: column; gap: 10px; animation: ru-in .3s ease; }
 .ru-c .ru-acc-inner img { border-radius: 10px; max-height: 260px; object-fit: cover; }
 .ru-c .ru-acc-numbered .ru-acc-inner { padding-left: calc(18px + 1.6em + 14px); }
@@ -693,13 +693,13 @@
 .ru-c .ru-itl-dot { width: 26px; height: 26px; border-radius: 50%; background: var(--ru-card); border: 4px solid var(--ru-line); transition: transform .2s, border-color .2s, background .2s; }
 .ru-c .ru-itl-point.is-seen .ru-itl-dot { border-color: var(--ru-accent); }
 .ru-c .ru-itl-point[aria-selected="true"] .ru-itl-dot { background: var(--ru-accent); border-color: var(--ru-accent); transform: scale(1.25); box-shadow: 0 0 0 6px color-mix(in srgb, var(--ru-accent) 20%, transparent); }
-.ru-c .ru-itl-plabel { font-weight: 800; color: var(--ru-accent); }
+.ru-c .ru-itl-plabel { font-weight: 800; color: var(--ru-accent-text, var(--ru-accent)); }
 .ru-c .ru-itl-ptitle { font-size: .85em; color: var(--ru-muted); text-align: center; max-width: 12em; }
 .ru-c .ru-itl-panel { margin-top: 14px; }
 .ru-c .ru-itl-detail { display: flex; gap: 20px; padding: 20px 22px; border-radius: var(--ru-radius); background: var(--ru-soft); animation: ru-in .35s ease; }
 .ru-c .ru-itl-detail img { width: 35%; border-radius: 10px; object-fit: cover; }
 @media (max-width: 600px) { .ru-c .ru-itl-detail { flex-direction: column; } .ru-c .ru-itl-detail img { width: 100%; } }
-.ru-c .ru-itl-date { font-weight: 800; color: var(--ru-accent); text-transform: uppercase; letter-spacing: .08em; font-size: .85em; }
+.ru-c .ru-itl-date { font-weight: 800; color: var(--ru-accent-text, var(--ru-accent)); text-transform: uppercase; letter-spacing: .08em; font-size: .85em; }
 .ru-c .ru-itl-title { display: block; font: 800 1.2em/1.25 var(--ru-heading-font, inherit); margin: 2px 0 6px; }
 .ru-c .ru-itl-cards { list-style: none; position: relative; display: flex; flex-direction: column; gap: 14px; }
 .ru-c .ru-itl-cards::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; background: linear-gradient(var(--ru-accent), var(--ru-line)); border-radius: 3px; }
@@ -717,7 +717,7 @@
 .ru-c .ru-itl-pbar { display: block; height: 6px; border-radius: 6px; background: var(--ru-line); overflow: hidden; }
 .ru-c .ru-itl-pfill { display: block; height: 100%; background: var(--ru-accent); transition: width .4s ease; }
 .ru-c .ru-itl-dates { display: flex; justify-content: space-between; margin: 8px 0 14px; font-weight: 800; font-size: .85em; color: var(--ru-muted); }
-.ru-c .ru-itl-dates .is-on { color: var(--ru-accent); }
+.ru-c .ru-itl-dates .is-on { color: var(--ru-accent-text, var(--ru-accent)); }
 .ru-c .ru-itl-stage { overflow: hidden; }
 .ru-c .ru-itl-stage .ru-itl-detail { min-height: 140px; }
 .ru-c .ru-itl-stage .is-fwd { animation: ru-from-right .4s ease; } .ru-c .ru-itl-stage .is-back { animation: ru-from-left .4s ease; }
@@ -732,7 +732,7 @@
 .ru-c .ru-scr-card { position: relative; min-height: 190px; border-radius: var(--ru-radius); overflow: hidden; background: var(--ru-card); box-shadow: 0 6px 18px rgba(0,0,0,.1); }
 .ru-c .ru-scr-under { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 18px; text-align: center; background: color-mix(in srgb, var(--ru-accent) 10%, var(--ru-card)); }
 .ru-c .ru-scr-under img { max-height: 90px; border-radius: 8px; }
-.ru-c .ru-scr-h { font: 900 2em/1 var(--ru-heading-font, inherit); color: var(--ru-accent); }
+.ru-c .ru-scr-h { font: 900 2em/1 var(--ru-heading-font, inherit); color: var(--ru-accent-text, var(--ru-accent)); }
 .ru-c .ru-scr-canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; touch-action: none; transition: opacity .6s ease; }
 .ru-c .ru-scr-card.is-revealed .ru-scr-canvas { opacity: 0; pointer-events: none; }
 .ru-c .ru-scr-reveal { position: absolute; right: 8px; bottom: 8px; padding: 4px 10px; border: 0; border-radius: 999px; background: rgba(255,255,255,.85); color: #1d2330; font: 700 12px/1.4 system-ui, sans-serif; cursor: pointer; opacity: 0; }
@@ -774,7 +774,7 @@
 .ru-c .ru-rt-term, .ru-c .ru-rt-pop { display: inline; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: help; }
 .ru-c .ru-rt-term { border-bottom: 2px dashed var(--ru-accent); }
 .ru-c .ru-rt-term:hover, .ru-c .ru-rt-term:focus-visible { background: color-mix(in srgb, var(--ru-accent) 12%, transparent); }
-.ru-c .ru-rt-pop { color: var(--ru-accent); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font-weight: 600; }
+.ru-c .ru-rt-pop { color: var(--ru-accent-text, var(--ru-accent)); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font-weight: 600; }
 .ru-c .ru-tip { position: absolute; z-index: 20; width: 280px; max-width: calc(100% - 8px); padding: 10px 14px; border-radius: 10px; background: #1d2330; color: #fff; font-size: .92em; line-height: 1.45; box-shadow: 0 12px 30px rgba(0,0,0,.25); pointer-events: none; animation: ru-in .15s ease; }
 .ru-c .ru-tip[hidden] { display: none; }
 /* Click-to-reveal checklist */

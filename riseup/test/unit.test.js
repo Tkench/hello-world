@@ -1045,3 +1045,17 @@ test('course background is packed as a file in the published zip', async () => {
   assert.match(cssText, /url\('media\/course-background\.jpg'\)/);
   assert.doesNotMatch(cssText, /data:image/, 'not inlined');
 });
+
+test('seamless course background: no block backgrounds, readable text', () => {
+  const c = config.defaultCourseConfig();
+  Object.assign(c.globalStyles, { pageImage: 'https://example.com/bg.jpg', pageBlocks: 'clear', pageOverlay: 'light' });
+  const light = css.buildCss(c);
+  assert.match(light, /background: transparent !important; box-shadow: none !important/);
+  assert.match(light, /rgba\(255,255,255,\.78\)/, 'stronger overlay');
+  assert.match(light, /\.ru-c:not\(\.ru-has-bg\) \{ --ru-soft: rgba\(255,255,255,\.4\)/, 'RiseUp panels blend in');
+  assert.doesNotMatch(light, /color: #ffffff !important/);
+  c.globalStyles.pageOverlay = 'dark';
+  const dark = css.buildCss(c);
+  assert.match(dark, /\[data-block-id\] p,[^{]*\{ color: #ffffff !important; \}/, 'Rise text turns white');
+  assert.match(dark, /--ru-ink: #ffffff !important/, 'RiseUp text turns white');
+});

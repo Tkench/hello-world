@@ -400,8 +400,8 @@
         field('Image', imageInput(gs.pageImage, (v) => { gs.pageImage = v; saveConfig(); }), 'stack'),
         gs.pageImage ? [
           field('Overlay', selectInput(gs.pageOverlay || 'light', [['light', 'Light'], ['dark', 'Dark'], ['none', 'None']], set('pageOverlay'))),
-          field('Rise blocks', selectInput(gs.pageBlocks || 'frosted', [['frosted', 'Frosted glass'], ['solid', 'Solid (as Rise)'], ['clear', 'See-through']], set('pageBlocks'))),
-          gs.pageBlocks === 'clear' ? h('p', { class: 'empty' }, 'Pair See-through with the Light overlay so text stays readable.') : null,
+          field('Blocks', selectInput(gs.pageBlocks || 'frosted', [['frosted', 'Frosted glass'], ['solid', 'Solid (as Rise)'], ['clear', 'Seamless (no block backgrounds)']], (v) => { gs.pageBlocks = v; saveConfig(); panel.render(); })),
+          gs.pageBlocks === 'clear' ? h('p', { class: 'empty' }, 'Every block, Rise\u2019s and RiseUp\u2019s, sits straight on the image. With the Dark overlay, text turns white. RiseUp blocks with their own background keep it.') : null,
         ] : null,
       ]),
       acc(T, 'animation', 'Scroll animation', [
