@@ -296,6 +296,14 @@
     swipe: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="5" y="2" width="7" height="10" rx="1.5" transform="rotate(12 8.5 7)"/><path d="M2 14h4M10 14h4M3.5 12.8 2 14l1.5 1.2M12.5 12.8 14 14l-1.5 1.2" stroke-linecap="round"/></svg>',
     divider: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 8h4.5M9.5 8H14"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/></svg>',
     checklist: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5l1 1 2-2M2.5 10.5l1 1 2-2M8 4.5h5.5M8 10.5h5.5"/></svg>',
+    tabs: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2 5h4V3h4v2h4v8H2z"/><path d="M6 5h4" /></svg>',
+    accordion: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="3" rx="1"/><rect x="2" y="7" width="12" height="6.5" rx="1"/><path d="M11 3.5l.5.5.5-.5" stroke-linecap="round"/></svg>',
+    itimeline: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 8h13"/><circle cx="4" cy="8" r="1.6" fill="currentColor"/><circle cx="8" cy="8" r="1.6"/><circle cx="12" cy="8" r="1.6"/><path d="M4 4.5v1.5M12 10v1.5"/></svg>',
+    scratch: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M4.5 10.5l3-3M6.5 11l4-4M9 11l2.5-2.5"/></svg>',
+    labelled: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M5 6h4M5 6l-1 2" stroke-linecap="round"/><rect x="8" y="9" width="4" height="2.5" rx=".8"/></svg>',
+    richtext: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 4h12M2 7.5h5M2 11h12"/><path d="M8.5 7.5h5" stroke-dasharray="1.4 1.2"/></svg>',
+    revealcheck: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="2" y="3" width="3.5" height="3.5" rx=".8"/><rect x="2" y="9.5" width="3.5" height="3.5" rx=".8"/><path d="M8 4.75h6M10.5 11.25h1" stroke-linecap="round"/></svg>',
+    cards: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="1.5" y="3" width="5.5" height="10" rx="1"/><rect x="9" y="3" width="5.5" height="10" rx="1"/><path d="M1.5 7h5.5M9 7h5.5"/></svg>',
     hotspots: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2.5" width="12" height="11" rx="2"/><circle cx="6" cy="7" r="1.5" fill="currentColor"/><circle cx="10.5" cy="9.5" r="1.5" fill="currentColor"/></svg>',
     sort: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 4h7M6 8h7M6 12h7M3 3.5v9M2 11l1 1.5L4 11"/></svg>',
     reveal: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/></svg>',
@@ -590,7 +598,9 @@
 
   function blockEditor(comp) {
     const def = RU.TYPES[comp.type];
-    const pickable = comp.type === 'hotspots' || comp.type === 'torch';
+    // Blocks where clicking the preview image adds a point: which list it adds to.
+    const PICK = { hotspots: ['points', (n) => ({ title: 'Spot ' + n, text: '' })], torch: ['points', (n) => ({ title: 'Spot ' + n, text: '' })], labelled: ['labels', (n) => ({ label: 'Label ' + n, text: '' })] };
+    const pickable = Boolean(PICK[comp.type]);
     const previewBox = h('div', { class: 'preview' + (pickable ? ' pickable' : '') });
     const drawPreview = () => {
       const node = RU.renderComponent(document, comp, { courseKey: 'preview', static: true });
@@ -605,13 +615,14 @@
       const torchStage = previewBox.querySelector('.ru-torch-stage');
       if (torchStage) torchStage.classList.add('is-lit'); // authors see every spot
       if (pickable) {
-        const stage = previewBox.querySelector('.ru-hs-stage, .ru-torch-stage');
+        const stage = previewBox.querySelector('.ru-hs-stage, .ru-torch-stage, .ru-lg-stage');
         stage && stage.addEventListener('click', (e) => {
           if (e.target.closest('button')) return;
           const r = stage.getBoundingClientRect();
           const x = Math.round(((e.clientX - r.left) / r.width) * 100);
           const y = Math.round(((e.clientY - r.top) / r.height) * 100);
-          comp.data.points = (comp.data.points || []).concat([{ title: 'Spot ' + ((comp.data.points || []).length + 1), text: '', x, y }]);
+          const [listKey, make] = PICK[comp.type];
+          comp.data[listKey] = (comp.data[listKey] || []).concat([Object.assign(make((comp.data[listKey] || []).length + 1), { x, y })]);
           saveConfig();
           panel.render();
         });

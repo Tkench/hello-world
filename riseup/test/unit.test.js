@@ -834,3 +834,152 @@ test('stats reveal shows one statistic at a time and replays', () => {
   btnText(node, 'Replay').click();
   assert.equal(node.querySelectorAll('.ru-st-row').length, 1);
 });
+
+// ------------------------------------------------------------------ batch 4
+require('../src/shared/components-layout.js');
+
+test('every batch 4 block renders its defaults, in every style', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const variants = { tabs: ['underline', 'pills', 'side'], accordion: ['cards', 'numbered', 'minimal'], itimeline: ['horizontal', 'cards', 'stepper'], labelled: ['tags', 'list', 'dragdots', 'dragzones'], cards: ['3', '2', 'rows'] };
+  for (const type of ['tabs', 'accordion', 'itimeline', 'scratch', 'labelled', 'richtext', 'revealcheck', 'cards']) {
+    const def = comps.TYPES[type];
+    for (const v of variants[type] || [null]) {
+      const data = def.defaults();
+      if (v) Object.assign(data, type === 'labelled' ? { mode: v } : type === 'cards' ? { layout: v } : { style: v });
+      const node = comps.renderComponent(doc, { id: 'b4' + type, type, data }, { courseKey: 'c4', static: true });
+      assert.ok(node && node.textContent.length > 0, type + ' ' + v);
+    }
+  }
+});
+
+test('tabs switch with clicks and arrow keys, one panel showing', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const node = comps.renderComponent(doc, { id: 't1', type: 'tabs', data: comps.TYPES.tabs.defaults() });
+  doc.body.appendChild(node);
+  const tabs = node.querySelectorAll('[role=tab]');
+  const visible = () => Array.from(node.querySelectorAll('[role=tabpanel]')).filter((p) => !p.hidden).map((p) => p.textContent);
+  assert.equal(visible().length, 1);
+  tabs[2].click();
+  assert.match(visible()[0], /Log it in the safety app/);
+  tabs[2].dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+  assert.equal(tabs[0].getAttribute('aria-selected'), 'true', 'wraps round');
+  assert.equal(doc.activeElement, tabs[0]);
+});
+
+test('click to reveal opens one section at a time', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const node = comps.renderComponent(doc, { id: 'a1', type: 'accordion', data: comps.TYPES.accordion.defaults() });
+  const btns = node.querySelectorAll('.ru-acc-btn');
+  btns[0].click();
+  btns[1].click();
+  assert.deepEqual(Array.from(btns).map((b) => b.getAttribute('aria-expanded')), ['false', 'true', 'false']);
+  const multi = comps.renderComponent(doc, { id: 'a2', type: 'accordion', data: Object.assign(comps.TYPES.accordion.defaults(), { single: false }) });
+  multi.querySelectorAll('.ru-acc-btn')[0].click();
+  multi.querySelectorAll('.ru-acc-btn')[1].click();
+  assert.equal(multi.querySelectorAll('[aria-expanded="true"]').length, 2);
+});
+
+test('timelines: points, expanding cards and stepper', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const base = comps.TYPES.itimeline.defaults();
+  const h = comps.renderComponent(doc, { id: 'h', type: 'itimeline', data: Object.assign({}, base, { style: 'horizontal' }) });
+  h.querySelectorAll('.ru-itl-point')[2].click();
+  assert.match(h.querySelector('.ru-itl-panel').textContent, /Management Regulations/);
+  const c = comps.renderComponent(doc, { id: 'c', type: 'itimeline', data: Object.assign({}, base, { style: 'cards' }) });
+  c.querySelectorAll('.ru-itl-card')[1].click();
+  assert.equal(c.querySelectorAll('.ru-itl-more')[1].hidden, false);
+  const s = comps.renderComponent(doc, { id: 's', type: 'itimeline', data: Object.assign({}, base, { style: 'stepper' }) });
+  assert.equal(btnText(s, '← Back').disabled, true);
+  btnText(s, 'Next →').click();
+  btnText(s, 'Next →').click();
+  assert.equal(s.querySelector('.ru-itl-count').textContent, '3 of 4');
+  assert.match(s.querySelector('.ru-itl-stage').textContent, /1999/);
+});
+
+test('labelled graphic: click labels to reveal, or drag (place) labels and check', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const base = comps.TYPES.labelled.defaults();
+  const t = comps.renderComponent(doc, { id: 'lt', type: 'labelled', data: Object.assign({}, base, { mode: 'tags' }) });
+  btnText(t, 'Extinguisher').click();
+  assert.match(t.querySelector('.ru-lg-info').textContent, /CO₂ for electrical fires/);
+  const l = comps.renderComponent(doc, { id: 'll', type: 'labelled', data: Object.assign({}, base, { mode: 'list' }) });
+  l.querySelectorAll('.ru-lg-li')[2].click();
+  assert.equal(l.querySelectorAll('.ru-lg-pin')[2].getAttribute('aria-pressed'), 'true', 'list and markers stay in step');
+  for (const mode of ['dragdots', 'dragzones']) {
+    const n = comps.renderComponent(doc, { id: 'ld' + mode, type: 'labelled', data: Object.assign({}, base, { mode }) });
+    doc.body.appendChild(n);
+    const place = (label, target) => { btnText(n, label).click(); n.querySelectorAll('.ru-lg-target, .ru-lg-zone')[target].click(); };
+    place('Fire exit', 0); place('Call point', 1); place('Extinguisher', 2); // two swapped
+    btnText(n, 'Check').click();
+    assert.match(n.querySelector('.ru-qfb').textContent, /1 of 3 in the right place/, mode);
+    assert.match(n.querySelector('.ru-lg-info').textContent, /Keep clear/, 'a correct label reveals more');
+    btnText(n, 'Try again').click();
+    place('Fire exit', 0); place('Extinguisher', 1); place('Call point', 2);
+    btnText(n, 'Check').click();
+    assert.match(n.querySelector('.ru-qfb').textContent, /3 of 3/);
+  }
+});
+
+test('text with definitions: hover terms show a tooltip, phrases open a pop-up', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const node = comps.renderComponent(doc, { id: 'rt', type: 'richtext', data: comps.TYPES.richtext.defaults() });
+  doc.body.appendChild(node);
+  const terms = node.querySelectorAll('.ru-rt-term');
+  assert.deepEqual(Array.from(terms).map((t) => t.textContent), ['responsible person', 'near miss']);
+  terms[0].dispatchEvent(new dom.window.Event('focus'));
+  const tip = node.querySelector('[role=tooltip]');
+  assert.equal(tip.hidden, false);
+  assert.match(tip.textContent, /legally accountable/);
+  assert.equal(terms[0].getAttribute('aria-describedby'), tip.id);
+  terms[0].dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  assert.equal(tip.hidden, true);
+  assert.match(node.textContent, /Every workplace has a responsible person for fire safety/, 'text reads in full');
+  node.querySelector('.ru-rt-pop').click();
+  assert.match(doc.querySelector('.ru-pop-overlay').textContent, /assembly point/);
+});
+
+test('click-to-reveal checklist hides each item until ticked', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const node = comps.renderComponent(doc, { id: 'rc', type: 'revealcheck', data: comps.TYPES.revealcheck.defaults() });
+  const content = node.querySelectorAll('.ru-rc-content');
+  assert.ok(Array.from(content).every((c) => c.hidden));
+  const box = node.querySelectorAll('input')[0];
+  box.checked = true; box.dispatchEvent(new dom.window.Event('change'));
+  assert.equal(content[0].hidden, false);
+  assert.equal(content[1].hidden, true);
+  node.querySelectorAll('input').forEach((b) => { b.checked = true; b.dispatchEvent(new dom.window.Event('change')); });
+  assert.match(node.querySelector('.ru-cl-done').textContent, /ready for your shift/);
+});
+
+test('card layout: bullets, pop-up buttons, safe links and videos only from https', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const node = comps.renderComponent(doc, { id: 'cd', type: 'cards', data: comps.TYPES.cards.defaults() });
+  doc.body.appendChild(node);
+  assert.equal(node.querySelectorAll('.ru-cards-card').length, 3);
+  assert.equal(node.querySelectorAll('.ru-cards-ul li').length, 3, 'lines starting with - become bullets');
+  node.querySelector('.ru-cards-btn').click();
+  assert.match(doc.querySelector('.ru-pop-overlay').textContent, /Pull the pin/);
+  const bad = comps.renderComponent(doc, { id: 'cd2', type: 'cards', data: { layout: 'rows', cards: [{ title: 'X', button: 'Go', link: 'javascript:alert(1)', video: 'http://x/a.mp4' }, { title: 'Y', button: 'Go', link: 'https://example.com', video: 'https://cdn.example.com/a.mp4' }] } });
+  assert.equal(bad.querySelectorAll('a').length, 1);
+  assert.equal(bad.querySelector('a').getAttribute('href'), 'https://example.com');
+  assert.equal(bad.querySelectorAll('video').length, 1);
+  assert.ok(bad.querySelector('.ru-cards-pause'));
+});
+
+test('scratch card can be revealed without scratching', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const node = comps.renderComponent(doc, { id: 'sc', type: 'scratch', data: comps.TYPES.scratch.defaults() });
+  doc.body.appendChild(node);
+  node.querySelector('.ru-scr-reveal').click();
+  assert.ok(node.querySelector('.ru-scr-card').classList.contains('is-revealed'));
+  assert.match(node.querySelector('[aria-live]').textContent, /1 in 3/);
+});

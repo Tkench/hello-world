@@ -89,6 +89,7 @@
         navJs: await ownFile('src/shared/nav.js'),
         componentsMoreJs: await ownFile('src/shared/components-more.js'),
         componentsExtraJs: await ownFile('src/shared/components-extra.js'),
+        componentsLayoutJs: await ownFile('src/shared/components-layout.js'),
         widgetJs: await ownFile('src/shared/widget.js'),
       };
       if ($('embed-fonts').checked && cfg.fonts.length) {
