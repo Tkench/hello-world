@@ -94,6 +94,8 @@ ${markers.map((m, i) => `<section class="block-wrapper${i === 1 ? ' dark' : ''}"
   await panel.locator('summary', { hasText: 'Course navigation' }).click();
   await panel.locator('label.field', { hasText: 'Menu' }).locator('select').selectOption('topbar');
   await panel.locator('label.field', { hasText: 'Bar colour' }).locator('select').selectOption('dark');
+  await panel.locator('summary', { hasText: 'Floating space' }).click();
+  await panel.getByLabel('Show a floating space learners can move around').check();
   await shot(page, '1-styles');
 
   // ---- Text
@@ -137,13 +139,16 @@ ${markers.map((m, i) => `<section class="block-wrapper${i === 1 ? ' dark' : ''}"
   await panel.locator('.tile', { hasText: 'Stat row' }).click();
   const statCode = (await panel.locator('.code-box code').textContent()).trim();
   await panel.getByRole('button', { name: '← All blocks' }).click();
-  assert.equal(await panel.locator('.item').count(), 2);
+  await panel.locator('.tile').filter({ has: page.locator('strong', { hasText: /^Sort into categories$/ }) }).click();
+  const sortCode = (await panel.locator('.code-box code').textContent()).trim();
+  await panel.getByRole('button', { name: '← All blocks' }).click();
+  assert.equal(await panel.locator('.item').count(), 3);
 
   // "Paste" the codes into the lesson; chips appear beside them in the editor.
-  markers = [flipCode, statCode, '[[RiseUp: hero zzzzzz]]'];
+  markers = [flipCode, statCode, '[[RiseUp: hero zzzzzz]]', sortCode];
   await page.reload();
-  await host.locator('.chip').nth(2).waitFor();
-  assert.deepEqual(await host.locator('.chip').allTextContents(), ['Flip cards', 'Stat row', 'Unknown block']);
+  await host.locator('.chip').nth(3).waitFor();
+  assert.deepEqual(await host.locator('.chip').allTextContents(), ['Flip cards', 'Stat row', 'Unknown block', 'Sort into categories']);
   await host.locator('.chip').first().click();
   await host.locator('.panel .code-box code', { hasText: flipCode }).waitFor();
   await shot(page, '5-editor-chips');
@@ -172,7 +177,14 @@ ${markers.map((m, i) => `<section class="block-wrapper${i === 1 ? ' dark' : ''}"
   preview.on('pageerror', (e) => errors.push('preview: ' + e.message));
   await preview.goto('https://rise.articulate.com/share/TESTCOURSE123#/lessons/l2');
   await preview.waitForSelector('.ru-c-flipcards .ru-flip');
-  assert.equal(await preview.locator('.ru-c').count(), 2, 'known codes become blocks');
+  assert.equal(await preview.locator('.ru-c').count(), 3, 'known codes become blocks');
+  // Sort the cards, check, and the floating score picks it up.
+  await preview.locator('.ru-w-chip').waitFor();
+  for (let i = 0; i < 6; i++) await preview.locator('.ru-sc-choice').first().click();
+  await preview.locator('.ru-c-sortcards button', { hasText: 'Check answers' }).click();
+  await preview.locator('.ru-c-sortcards .ru-qfb', { hasText: 'of 6 correct' }).waitFor();
+  assert.match(await preview.locator('.ru-w-label').textContent(), /Score\d+ \/ 10/);
+  assert.notEqual(await preview.locator('.ru-w-label').textContent(), 'Score0 / 10', 'score recorded');
   assert.equal(await preview.evaluate(() => Array.from(document.querySelectorAll('p')).filter((p) => p.textContent.includes('[[RiseUp') && p.offsetParent !== null).length), 0, 'no codes visible to learners');
   assert.equal(await preview.locator('.ru-c-flipcards .ru-flip-text').first().textContent(), 'Fire triangle');
   await preview.locator('.ru-c-flipcards .ru-flip').first().click();
@@ -199,7 +211,7 @@ ${markers.map((m, i) => `<section class="block-wrapper${i === 1 ? ' dark' : ''}"
   assert.ok((await preview.locator('[data-block-id="b1"]').boundingBox()).x < 400, 'content re-centred without the sidebar');
   await preview.locator('.ru-nav-links a', { hasText: 'Reporting' }).click();
   await preview.waitForFunction(() => location.hash === '#/lessons/l3');
-  assert.equal(await preview.locator('.ru-nav-links [aria-current="page"]').textContent(), 'Reporting');
+  await preview.locator('.ru-nav-links [aria-current="page"]', { hasText: 'Reporting' }).waitFor(); // updates on the hashchange event
   await preview.waitForTimeout(1600);
   await shot(preview, '7-preview', { fullPage: true });
 
@@ -226,7 +238,7 @@ ${markers.map((m, i) => `<section class="block-wrapper${i === 1 ? ' dark' : ''}"
   await tools.click('#backup-all');
   const backupPath = await (await bdl).path();
   const backup = JSON.parse(fs.readFileSync(backupPath, 'utf8'));
-  assert.equal(backup.courses.TESTCOURSE123.components.length, 2);
+  assert.equal(backup.courses.TESTCOURSE123.components.length, 3);
   tools.once('dialog', (d) => d.accept());
   await tools.click('#delete');
   await tools.locator('#backup-status', { hasText: 'Deleted' }).waitFor();
@@ -234,7 +246,7 @@ ${markers.map((m, i) => `<section class="block-wrapper${i === 1 ? ' dark' : ''}"
   tools.once('dialog', (d) => d.accept());
   await tools.setInputFiles('#restore-input', backupPath);
   await tools.locator('#backup-status', { hasText: 'Restored 1 course' }).waitFor();
-  assert.equal(await sw.evaluate(async () => (await chrome.storage.local.get('riseup:course:TESTCOURSE123'))['riseup:course:TESTCOURSE123'].components.length), 2);
+  assert.equal(await sw.evaluate(async () => (await chrome.storage.local.get('riseup:course:TESTCOURSE123'))['riseup:course:TESTCOURSE123'].components.length), 3);
 
   // Open the published course from disk: blocks work without the extension.
   const dir = path.join(profile, 'unzipped');
@@ -249,7 +261,8 @@ ${markers.map((m, i) => `<section class="block-wrapper${i === 1 ? ' dark' : ''}"
   await lms.waitForSelector('.ru-c-stats .ru-stat');
   await lms.locator('nav.ru-nav').waitFor();
   assert.equal(await lms.locator('.nav-sidebar').isVisible(), false);
-  assert.equal(await lms.locator('.ru-c').count(), 2);
+  assert.equal(await lms.locator('.ru-c').count(), 3);
+  await lms.locator('.ru-w-chip').waitFor();
   assert.equal(await lms.$eval('[data-block-id="b1"]', (el) => getComputedStyle(el).borderTopLeftRadius), '16px');
 
   // ================================================================ popup

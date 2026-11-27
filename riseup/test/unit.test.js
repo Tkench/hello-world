@@ -517,3 +517,182 @@ test('the sidebar is not hidden when it can\'t be told apart from lesson content
   assert.ok(doc.querySelector('.ru-nav'), 'menu still added');
   assert.equal(doc.querySelectorAll('.ru-nav-hidden').length, 0, 'nothing hidden');
 });
+
+// ------------------------------------------------------------------ more blocks
+const more = require('../src/shared/components-more.js');
+const widgetLib = require('../src/shared/widget.js');
+const mkdom = (url) => new JSDOM('<!doctype html><body></body>', { pretendToBeVisual: true, url: url || 'https://lms.example/course/' });
+const btnText = (node, t) => Array.from(node.querySelectorAll('button')).find((b) => b.textContent === t);
+
+test('every new block renders its defaults', () => {
+  const dom = mkdom();
+  for (const type of ['sortcards', 'fillblanks', 'popup', 'collect', 'torch', 'blender', 'conversation', 'chart']) {
+    const def = comps.TYPES[type];
+    assert.ok(def, type + ' registered');
+    const node = comps.renderComponent(dom.window.document, { id: 'n' + type, type, data: def.defaults() }, { courseKey: 'c', static: true });
+    assert.ok(node && node.textContent.length > 0, type);
+  }
+  assert.match(comps.COMPONENT_CSS, /ru-sc-lane/, 'styles added');
+});
+
+test('sort into categories: one card at a time, feedback at the end', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const scores = [];
+  doc.addEventListener('riseup:score', (e) => scores.push(e.detail));
+  const data = { title: 'T', categories: [{ name: 'Meet' }, { name: 'Email' }], cards: [
+    { text: 'Review', category: '1', feedback: 'Discuss it.' }, { text: 'Update', category: '2', feedback: 'Send it.' }, { text: 'Conflict', category: '1', feedback: 'Talk.' },
+  ], correctFeedback: 'All right', incorrectFeedback: 'Some wrong', showAnswers: true };
+  const node = comps.renderComponent(doc, { id: 'sc1', type: 'sortcards', data });
+  doc.body.appendChild(node);
+  const correctCat = { Review: 0, Update: 1, Conflict: 0 };
+  let placedWrong = false;
+  for (let i = 0; i < 3; i++) {
+    const text = node.querySelector('.ru-sc-card-text').textContent;
+    assert.equal(node.querySelector('.ru-qfb').hidden, true, 'no feedback until all placed');
+    let cat = correctCat[text];
+    if (text === 'Update') { cat = 0; placedWrong = true; }
+    node.querySelectorAll('.ru-sc-choice')[cat].click();
+  }
+  assert.ok(placedWrong);
+  assert.equal(node.querySelector('.ru-sc-count').textContent, '3 of 3 placed');
+  btnText(node, 'Check answers').click();
+  const fb = node.querySelector('.ru-qfb');
+  assert.match(fb.textContent, /2 of 3 correct/);
+  assert.match(fb.textContent, /Update → Email/);
+  assert.match(fb.textContent, /Send it/);
+  assert.deepEqual(scores, [{ id: 'sc1', score: 2, max: 3 }]);
+  btnText(node, 'Show answers').click();
+  assert.equal(node.querySelectorAll('.ru-sc-item.is-right').length, 3);
+});
+
+test('sort into categories: keyboard numbers place the card, and cards can be sent back', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const node = comps.renderComponent(doc, { id: 'sc2', type: 'sortcards', data: comps.TYPES.sortcards.defaults() });
+  doc.body.appendChild(node);
+  node.querySelector('.ru-sc-card').dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: '2', bubbles: true }));
+  assert.equal(node.querySelectorAll('.ru-sc-lane')[1].querySelectorAll('.ru-sc-item').length, 1);
+  node.querySelector('.ru-sc-back').click();
+  assert.equal(node.querySelectorAll('.ru-sc-item').length, 0);
+  assert.equal(node.querySelector('.ru-sc-count').textContent, '0 of 6 placed');
+});
+
+test('complete the sentence: gaps accept alternatives, feedback at the end', () => {
+  assert.deepEqual(more.parseGaps('A [b|c] d [e]').map((p) => p.answers || p.text), ['A ', ['b', 'c'], ' d ', ['e']]);
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const data = { text: 'Raise the [alarm]. Never use the [lift|elevator].', distractors: 'stairs, window', correctFeedback: 'Yes', incorrectFeedback: 'No', showAnswers: true };
+  const node = comps.renderComponent(doc, { id: 'fb1', type: 'fillblanks', data });
+  doc.body.appendChild(node);
+  const words = () => Array.from(node.querySelectorAll('.ru-fb-word')).map((b) => b.textContent).sort();
+  assert.deepEqual(words(), ['alarm', 'lift', 'stairs', 'window']);
+  const gaps = node.querySelectorAll('.ru-fb-gap');
+  const put = (w, g) => { Array.from(node.querySelectorAll('.ru-fb-word')).find((b) => b.textContent === w).click(); gaps[g].click(); };
+  put('alarm', 0);
+  assert.equal(btnText(node, 'Check answers'), undefined, 'check appears once every gap is filled');
+  put('stairs', 1);
+  gaps[1].click(); // send it back
+  assert.ok(words().includes('stairs'));
+  put('lift', 1);
+  btnText(node, 'Check answers').click();
+  assert.match(node.querySelector('.ru-qfb').textContent, /2 of 2 correct/);
+  assert.equal(node.querySelectorAll('.ru-fb-gap.is-right').length, 2);
+});
+
+test('pop-up opens over the page, traps nothing it shouldn\'t, and closes', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const wrap = comps.renderComponent(doc, { id: 'p1', type: 'popup', data: Object.assign(comps.TYPES.popup.defaults(), { triggerStyle: 'button', triggerText: 'More' }) });
+  doc.body.appendChild(wrap);
+  btnText(wrap, 'More').click();
+  const dlg = doc.querySelector('.ru-pop-overlay [role=dialog]');
+  assert.ok(dlg);
+  assert.match(dlg.textContent, /Why it matters/);
+  assert.equal(doc.activeElement.textContent, 'Got it', 'focus moves into the pop-up');
+  doc.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  assert.equal(doc.querySelector('.ru-pop-overlay'), null);
+  assert.equal(doc.activeElement.textContent, 'More', 'focus returns to the button');
+});
+
+test('collectables are remembered on the device and announced', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const got = [];
+  doc.addEventListener('riseup:collect', (e) => got.push(e.detail.name));
+  const make = () => { const n = comps.renderComponent(doc, { id: 'k1', type: 'collect', data: comps.TYPES.collect.defaults() }, { courseKey: 'course-a' }); doc.body.appendChild(n); return n; };
+  const a = make();
+  btnText(a, 'Collect').click();
+  assert.deepEqual(got, ['Fire safety badge']);
+  assert.ok(make().querySelector('.ru-col').classList.contains('is-collected'), 'still collected when rendered again');
+  assert.ok(more.progress.read(dom.window, 'course-a').collected.k1);
+});
+
+test('conversation: replies move the meter, give feedback, and end with a score', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const scores = [];
+  doc.addEventListener('riseup:score', (e) => scores.push(e.detail));
+  const node = comps.renderComponent(doc, { id: 'cv1', type: 'conversation', data: comps.TYPES.conversation.defaults() }, { static: true });
+  doc.body.appendChild(node);
+  btnText(node, 'Start').click();
+  assert.match(node.querySelector('.ru-cv-log').textContent, /supposed to arrive Monday/);
+  assert.equal(node.querySelector('.ru-cv-pct').textContent, '50%');
+  btnText(node, 'I’m sorry. That’s not good enough, let me find out what happened.').click();
+  assert.equal(node.querySelector('.ru-cv-pct').textContent, '65%');
+  assert.match(node.querySelector('.ru-cv-log').textContent, /Good response/);
+  assert.match(node.querySelector('.ru-cv-log').textContent, /I just want to know where it is/);
+  btnText(node, 'It should be with you soon.').click();
+  assert.equal(node.querySelector('.ru-cv-pct').textContent, '45%');
+  assert.match(node.querySelector('.ru-cv-end').textContent, /Dana’s calmer/);
+  assert.deepEqual(scores, [{ id: 'cv1', score: 45, max: 100 }]);
+});
+
+test('data story highlights the chosen value and headline words', () => {
+  const dom = mkdom();
+  const node = comps.renderComponent(dom.window.document, { id: 'd1', type: 'chart', data: comps.TYPES.chart.defaults() }, { static: true });
+  assert.equal(node.querySelector('.ru-ds-mark').textContent, 'Login issues');
+  assert.equal(node.querySelector('.ru-ds-centre-val').textContent, '42.8%');
+  assert.equal(node.querySelector('.ru-ds-legend .is-focus .ru-ds-lname').textContent, 'Login');
+  assert.equal(node.querySelector('.ru-ds-callout mark').textContent, 'combined');
+  const cols = comps.renderComponent(dom.window.document, { id: 'd2', type: 'chart', data: Object.assign(comps.TYPES.chart.defaults(), { chartType: 'columns', suffix: '' }) }, { static: true });
+  assert.equal(cols.querySelectorAll('.ru-ds-bar').length, 5);
+  assert.ok(cols.querySelector('.ru-ds-bar.is-focus .ru-ds-label').textContent === 'Login');
+});
+
+test('floating score adds up activities and keeps the best attempt', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const components = [{ id: 'q1', type: 'single', name: 'Fire question' }, { id: 's1', type: 'sortcards', name: 'Sort' }, { id: 'x', type: 'hero' }];
+  const w = widgetLib.startWidget(doc, { enabled: true, type: 'score' }, { courseKey: 'ck', components });
+  const label = () => doc.querySelector('.ru-w-label').textContent;
+  assert.equal(label(), 'Score0 / 20');
+  comps.emitScore(doc, 's1', 3, 4);
+  assert.equal(label(), 'Score8 / 20');
+  comps.emitScore(doc, 's1', 1, 4); // worse attempt is ignored
+  assert.equal(label(), 'Score8 / 20');
+  comps.emitScore(doc, 'q1', 1, 1);
+  assert.equal(label(), 'Score18 / 20');
+  doc.querySelector('.ru-w-chip').dispatchEvent(new dom.window.MouseEvent('click', { detail: 0 }));
+  assert.match(doc.querySelector('.ru-w-panel').textContent, /Fire question10 \/ 10/);
+  w.stop();
+  assert.equal(doc.querySelector('.ru-w'), null);
+});
+
+test('floating collection fills as items are collected', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const components = [{ id: 'a', type: 'collect', data: { name: 'Badge A', icon: 'A' } }, { id: 'b', type: 'collect', data: { name: 'Badge B', icon: 'B' } }];
+  widgetLib.startWidget(doc, { enabled: true, type: 'collection', title: 'Badges' }, { courseKey: 'ck2', components });
+  const node = comps.renderComponent(doc, { id: 'a', type: 'collect', data: components[0].data }, { courseKey: 'ck2' });
+  doc.body.appendChild(node);
+  btnText(node, 'Collect').click();
+  assert.equal(doc.querySelector('.ru-w-label').textContent, 'Badges1 of 2');
+  assert.ok(doc.querySelector('.ru-w-toast'));
+});
+
+test('progress still works when the browser blocks storage', () => {
+  const fakeWin = { get localStorage() { throw new Error('SecurityError'); } };
+  more.progress.update(fakeWin, 'blocked', (p) => { p.scores.q = { score: 1, max: 1 }; });
+  assert.deepEqual(more.progress.read(fakeWin, 'blocked').scores.q, { score: 1, max: 1 });
+});

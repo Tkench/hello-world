@@ -278,6 +278,14 @@
     flipcarousel: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="5" y="3" width="6" height="10" rx="1.4"/><path d="M3 5v6M13 5v6" stroke-linecap="round"/></svg>',
     single: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="4.5" cy="5" r="2"/><circle cx="4.5" cy="11" r="2"/><circle cx="4.5" cy="11" r=".6" fill="currentColor"/><path d="M8.5 5h5M8.5 11h5" stroke-linecap="round"/></svg>',
     multiple: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="2.5" y="3" width="4" height="4" rx="1"/><rect x="2.5" y="9" width="4" height="4" rx="1"/><path d="M3.5 5l.8.8 1.4-1.6M3.5 11l.8.8 1.4-1.6M8.5 5h5M8.5 11h5" stroke-linecap="round"/></svg>',
+    sortcards: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="2" y="2.5" width="5" height="11" rx="1.2"/><rect x="9" y="2.5" width="5" height="11" rx="1.2"/><path d="M3.5 6h2M10.5 6h2M10.5 8.5h2" stroke-linecap="round"/></svg>',
+    fillblanks: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 6h3M11 6h3M2 11h5"/><rect x="6" y="4" width="4" height="4" rx="1" stroke-dasharray="1.5 1.2"/></svg>',
+    popup: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="2" y="3" width="12" height="9" rx="2"/><path d="M8 6v.01M8 8v2" stroke-linecap="round"/></svg>',
+    collect: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 2l1.8 3.7 4 .6-2.9 2.8.7 4L8 11.2 4.4 13.1l.7-4L2.2 6.3l4-.6z"/></svg>',
+    torch: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M5 2h6l-1 4H6z"/><path d="M6 6h4v8H6z"/><path d="M3 3l1 1M13 3l-1 1" stroke-linecap="round"/></svg>',
+    blender: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="7" r="4"/><circle cx="10" cy="7" r="4"/><path d="M2 14h12" stroke-linecap="round"/></svg>',
+    conversation: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2 3h8v5H5l-3 2.5z"/><path d="M10 6h4v5.5L12 10H7.5V8"/></svg>',
+    chart: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5V8l4.5 3" stroke-linecap="round"/></svg>',
     hotspots: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2.5" width="12" height="11" rx="2"/><circle cx="6" cy="7" r="1.5" fill="currentColor"/><circle cx="10.5" cy="9.5" r="1.5" fill="currentColor"/></svg>',
     sort: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 4h7M6 8h7M6 12h7M3 3.5v9M2 11l1 1.5L4 11"/></svg>',
     reveal: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/></svg>',
@@ -358,6 +366,7 @@
     const gs = state.config.globalStyles;
     const anim = state.config.animation;
     const nav = state.config.navigation;
+    const wdg = state.config.widget;
     const set = (k) => (v) => { gs[k] = v; saveConfig(); };
     const setAnim = (k) => (v) => { anim[k] = v; saveConfig(); };
     const T = 'styles';
@@ -381,6 +390,14 @@
           field('Title', h('input', { type: 'text', value: nav.title || '', placeholder: 'Course title', oninput: (e) => { nav.title = e.target.value; saveConfig({ silent: true }); } })),
           field('Logo', imageInput(nav.logo, (v) => { nav.logo = v; saveConfig(); }), 'stack'),
           h('p', { class: 'empty' }, 'Replaces Rise\u2019s left sidebar with a menu across the top. See it in Preview and the published course.'),
+        ] : null,
+      ]),
+      acc(T, 'widget', 'Floating space', [
+        h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: Boolean(wdg.enabled), onchange: (e) => { wdg.enabled = e.target.checked; saveConfig(); panel.render(); } }), 'Show a floating space learners can move around'),
+        wdg.enabled ? [
+          field('Shows', selectInput(wdg.type, [['score', 'Score from activities'], ['collection', 'Collection (use Collectable blocks)'], ['menu', 'Lesson menu']], (v) => { wdg.type = v; saveConfig(); })),
+          field('Title', h('input', { type: 'text', value: wdg.title || '', placeholder: 'Default', oninput: (e) => { wdg.title = e.target.value; saveConfig({ silent: true }); } })),
+          h('p', { class: 'empty' }, 'Appears in Preview and the published course. Learners can drag it anywhere; progress is kept on their device.'),
         ] : null,
       ]),
       acc(T, 'buttons', 'Buttons', [
@@ -561,7 +578,8 @@
 
   function blockEditor(comp) {
     const def = RU.TYPES[comp.type];
-    const previewBox = h('div', { class: 'preview' + (comp.type === 'hotspots' ? ' pickable' : '') });
+    const pickable = comp.type === 'hotspots' || comp.type === 'torch';
+    const previewBox = h('div', { class: 'preview' + (pickable ? ' pickable' : '') });
     const drawPreview = () => {
       const node = RU.renderComponent(document, comp, { courseKey: 'preview', static: true });
       const theme = state.config.componentTheme;
@@ -571,15 +589,17 @@
         delete look.dark; // the preview card is always light
         RU.applyCourseTheme(node, look, { keepAccent: Boolean(theme.accent) });
       }
-      previewBox.replaceChildren(h('span', { class: 'preview-label' }, comp.type === 'hotspots' ? 'Preview · click the image to add a hotspot' : 'Preview'), node || '');
-      if (comp.type === 'hotspots') {
-        const stage = previewBox.querySelector('.ru-hs-stage');
+      previewBox.replaceChildren(h('span', { class: 'preview-label' }, pickable ? 'Preview · click the image to add a spot' : 'Preview'), node || '');
+      const torchStage = previewBox.querySelector('.ru-torch-stage');
+      if (torchStage) torchStage.classList.add('is-lit'); // authors see every spot
+      if (pickable) {
+        const stage = previewBox.querySelector('.ru-hs-stage, .ru-torch-stage');
         stage && stage.addEventListener('click', (e) => {
           if (e.target.closest('button')) return;
           const r = stage.getBoundingClientRect();
           const x = Math.round(((e.clientX - r.left) / r.width) * 100);
           const y = Math.round(((e.clientY - r.top) / r.height) * 100);
-          comp.data.points = (comp.data.points || []).concat([{ title: 'Hotspot ' + ((comp.data.points || []).length + 1), text: '', x, y }]);
+          comp.data.points = (comp.data.points || []).concat([{ title: 'Spot ' + ((comp.data.points || []).length + 1), text: '', x, y }]);
           saveConfig();
           panel.render();
         });

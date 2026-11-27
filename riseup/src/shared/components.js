@@ -84,6 +84,11 @@
     return a.slice(1).concat(a[0]);
   }
 
+  /** Tell the floating score widget (and anything else listening) about a result. */
+  function emitScore(doc, id, score, max) {
+    try { doc.dispatchEvent(new doc.defaultView.CustomEvent('riseup:score', { detail: { id: String(id), score: Number(score) || 0, max: Number(max) || 0 } })); } catch (e) { /* old browsers */ }
+  }
+
   // ------------------------------------------------------------------ types
   const TYPES = {};
 
@@ -539,6 +544,7 @@
       fb.hidden = false;
       submit.hidden = true;
       retry.hidden = final;
+      if (final) emitScore(doc, (ctx && ctx.id) || 'q', result === 'correct' ? 1 : 0, 1);
       live.textContent = titles[result] + '. ' + (message || '');
       fb.focus({ preventScroll: true });
     });
@@ -954,7 +960,7 @@
     let accent = safeColor(theme && theme.accent) || '#2f6fde';
     if (accent.length === 4) accent = '#' + accent.slice(1).split('').map((c) => c + c).join('');
     const radius = Math.min(32, Math.max(0, Number(theme && theme.radius) || 12));
-    return '.ru-c, .ru-nav, .ru-nav-overlay { --ru-accent: ' + accent + '; --ru-accent-ink: ' + inkFor(accent) + '; --ru-accent-ink-large: ' + largeInkFor(accent) + '; --ru-radius: ' + radius + 'px; }';
+    return '.ru-c, .ru-nav, .ru-nav-overlay, .ru-w { --ru-accent: ' + accent + '; --ru-accent-ink: ' + inkFor(accent) + '; --ru-accent-ink-large: ' + largeInkFor(accent) + '; --ru-radius: ' + radius + 'px; }';
   }
 
   const ANIMATIONS = { none: 'None', fade: 'Fade in', rise: 'Rise up', zoom: 'Zoom in', slide: 'Slide in from the side' };
@@ -1245,5 +1251,7 @@
     TYPES, MARKER_RE, COMPONENT_CSS, ANIMATIONS,
     markerFor, newComponentId, renderComponent, themeCss, inkFor, safeUrl,
     detectCourseTheme, applyCourseTheme,
+    // building blocks for blocks defined in other files
+    _el: el, _shuffled: shuffled, _onVisible: onVisible, _reducedMotion: reducedMotion, _safeColor: safeColor, emitScore,
   };
 });

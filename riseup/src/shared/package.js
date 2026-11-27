@@ -41,7 +41,9 @@
       '<script src="riseup/riseup-config.js"></script>',
       '<script src="riseup/text-rules.js"></script>',
       '<script src="riseup/components.js"></script>',
+      '<script src="riseup/components-more.js"></script>',
       '<script src="riseup/nav.js"></script>',
+      '<script src="riseup/widget.js"></script>',
       '<script src="riseup/riseup-runtime.js"></script>',
       END].join('\n');
     if (!/<\/head>/i.test(clean) || !/<\/body>/i.test(clean)) throw new Error('The course page has no </head> or </body> tag, so RiseUp could not add its styling.');
@@ -57,6 +59,7 @@
       componentTheme: config.componentTheme || {},
       animation: config.animation || { type: 'none' },
       navigation: config.navigation || { layout: 'rise' },
+      widget: config.widget || { enabled: false },
       blockSelector: deps.SELECTORS.block,
     };
   }
@@ -132,6 +135,8 @@
     zip.file(dir + 'riseup/text-rules.js', assets.textRulesJs);
     zip.file(dir + 'riseup/components.js', assets.componentsJs || '');
     zip.file(dir + 'riseup/nav.js', assets.navJs || '');
+    zip.file(dir + 'riseup/components-more.js', assets.componentsMoreJs || '');
+    zip.file(dir + 'riseup/widget.js', assets.widgetJs || '');
     zip.file(dir + 'riseup/riseup-runtime.js', assets.runtimeJs);
     zip.file(index, injectIntoHtml(html, { fontCssHref }));
     return { index, dir, fontsEmbedded: Boolean(assets.fontCss) };

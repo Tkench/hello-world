@@ -161,6 +161,9 @@
         },
       });
     }
+    var widget = (RU.startWidget && cfg.widget && cfg.widget.enabled)
+      ? RU.startWidget(doc, cfg.widget, { courseKey: courseKey(), components: cfg.components || [] })
+      : null;
     apply();
 
     return {
@@ -169,6 +172,7 @@
       stop: function () {
         observer.disconnect();
         if (nav) nav.stop();
+        if (widget) widget.stop();
         if (io) io.disconnect();
         mounted.forEach(function (m) {
           if (m.node && m.node.parentNode) m.node.parentNode.removeChild(m.node);
