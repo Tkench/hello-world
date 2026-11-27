@@ -395,6 +395,15 @@
         field('Shadow', selectInput(gs.blockShadow, [['none', 'None'], ['soft', 'Soft'], ['medium', 'Medium'], ['strong', 'Strong']], set('blockShadow'))),
         field('Image corner radius', numberInput(gs.imageRadius, set('imageRadius'), { min: 0, max: 64 })),
       ]),
+      acc(T, 'pagebg', 'Course background', [
+        h('p', { class: 'empty' }, 'One image fixed behind the whole course. It stays still as learners scroll. Shows in Preview and the published course.'),
+        field('Image', imageInput(gs.pageImage, (v) => { gs.pageImage = v; saveConfig(); }), 'stack'),
+        gs.pageImage ? [
+          field('Overlay', selectInput(gs.pageOverlay || 'light', [['light', 'Light'], ['dark', 'Dark'], ['none', 'None']], set('pageOverlay'))),
+          field('Rise blocks', selectInput(gs.pageBlocks || 'frosted', [['frosted', 'Frosted glass'], ['solid', 'Solid (as Rise)'], ['clear', 'See-through']], set('pageBlocks'))),
+          gs.pageBlocks === 'clear' ? h('p', { class: 'empty' }, 'Pair See-through with the Light overlay so text stays readable.') : null,
+        ] : null,
+      ]),
       acc(T, 'animation', 'Scroll animation', [
         field('Blocks appear with', selectInput(anim.type, Object.entries(RU.ANIMATIONS), setAnim('type'))),
         field('Speed', selectInput(String(anim.duration), [['450', 'Quick'], ['700', 'Normal'], ['1100', 'Slow']], (v) => setAnim('duration')(Number(v)))),
@@ -592,6 +601,9 @@
           : 'Blocks use the colour below and the page\u2019s default font.'),
         field(theme.matchCourse !== false ? 'Override colour' : 'Accent colour', colorInput(theme.accent, (v) => { theme.accent = v; saveConfig(); })),
         field('Corner radius', numberInput(theme.radius, (v) => { theme.radius = v === null ? 12 : v; saveConfig(); }, { min: 0, max: 32 })),
+        h('p', { class: 'group-label', style: 'margin-top:16px' }, 'Default background'),
+        h('p', { class: 'empty' }, 'Used behind every RiseUp block unless a block sets its own or None.'),
+        formFields(RU.BG_FIELDS.map((f) => Object.assign({}, f, { key: f.key.replace(/^bg/, '').replace(/^./, (c) => c.toLowerCase()) })), theme.bg = theme.bg || {}, () => saveConfig()),
       ])),
     ];
   }
@@ -603,7 +615,7 @@
     const pickable = Boolean(PICK[comp.type]);
     const previewBox = h('div', { class: 'preview' + (pickable ? ' pickable' : '') });
     const drawPreview = () => {
-      const node = RU.renderComponent(document, comp, { courseKey: 'preview', static: true });
+      const node = RU.renderComponent(document, comp, { courseKey: 'preview', static: true, bg: state.config.componentTheme.bg });
       const theme = state.config.componentTheme;
       if (node && theme.matchCourse !== false) {
         // Preview with the course's fonts and colours, read from the lesson that's open.
@@ -640,6 +652,7 @@
       previewBox,
       field('Block name', h('input', { type: 'text', value: comp.name || '', placeholder: def.label, oninput: (e) => { comp.name = e.target.value; saveConfig({ silent: true }); } })),
       formFields(def.fields, comp.data, changed),
+      backgroundSection(comp, changed),
       h('div', { class: 'row', style: 'margin-top:14px' },
         h('button', { class: 'btn danger', type: 'button', onclick: () => {
           if (!confirm('Delete “' + (comp.name || def.label) + '”? Its code will stop working in this course.')) return;
@@ -647,6 +660,18 @@
           editingId = null; saveConfig({ now: true }); panel.render();
         } }, svg('trash'), 'Delete block')),
     ];
+  }
+
+  /** Background settings for one block: course default, its own, or none. */
+  function backgroundSection(comp, changed) {
+    const data = comp.data;
+    const mode = data.bgMode || 'default';
+    const hasDefault = Boolean(state.config.componentTheme.bg && (state.config.componentTheme.bg.image || state.config.componentTheme.bg.color));
+    return h('details', { class: 'acc', style: 'margin-top:12px', open: mode === 'custom' },
+      h('summary', null, 'Background', h('span', { class: 'count' }, mode === 'custom' ? 'Custom' : mode === 'none' ? 'None' : (hasDefault ? 'Course default' : ''))),
+      h('div', { class: 'acc-body' },
+        field('Background', selectInput(mode, [['default', hasDefault ? 'Course default' : 'Course default (none set)'], ['custom', 'Custom for this block'], ['none', 'None']], (v) => { data.bgMode = v; changed(); panel.render(); })),
+        mode === 'custom' ? formFields(RU.BG_FIELDS, data, changed) : h('p', { class: 'empty' }, hasDefault ? 'Uses the course default from Blocks \u2192 Block look.' : 'Set a default for every block under Blocks \u2192 Block look, or choose Custom.')));
   }
 
   let marksTimer = null;

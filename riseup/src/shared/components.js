@@ -922,17 +922,64 @@
     set('--ru-heading-font', t.headingFont);
     set('--ru-body-font', t.bodyFont);
     set('--ru-btn-radius', t.buttonRadius);
+    if (node.classList.contains('ru-has-bg')) return; // its own background decides light or dark
     if (t.dark) node.classList.add('ru-on-dark');
     else set('--ru-ink', t.ink);
   }
 
   // ------------------------------------------------------------------ render
+  // ------------------------------------------------------------------ backgrounds
+  /** Background settings every block has (stored in the block's data with a bg prefix). */
+  const BG_OVERLAYS = [['none', 'None'], ['light', 'Light (dark text)'], ['dark', 'Dark (light text)'], ['accent', 'Course colour']];
+  const BG_FIELDS = [
+    { key: 'bgImage', label: 'Image', type: 'image' },
+    { key: 'bgColor', label: 'Colour (behind the image, or on its own)', type: 'color' },
+    { key: 'bgOverlay', label: 'Overlay, to keep text readable', type: 'select', options: BG_OVERLAYS },
+    { key: 'bgWidth', label: 'Width', type: 'select', options: [['contained', 'Inside the content column'], ['full', 'Full page width']] },
+    { key: 'bgPadding', label: 'Space around the block', type: 'select', options: [['medium', 'Medium'], ['small', 'Small'], ['large', 'Large']] },
+    { key: 'bgFixed', label: 'Image stays still as learners scroll (parallax)', type: 'checkbox' },
+  ];
+
+  /**
+   * The background a block should have: its own (bgMode 'custom'), none, or
+   * the course default (ctx.bg, from the Block look settings).
+   */
+  function resolveBackground(data, ctx) {
+    const mode = data.bgMode || 'default';
+    if (mode === 'none') return null;
+    const src = mode === 'custom'
+      ? { image: data.bgImage, color: data.bgColor, overlay: data.bgOverlay, width: data.bgWidth, padding: data.bgPadding, fixed: data.bgFixed }
+      : (ctx && ctx.bg) || {};
+    const image = safeUrl(src.image, 'image');
+    const color = safeColor(src.color);
+    if (!image && !color) return null;
+    return {
+      image, color,
+      overlay: ['light', 'dark', 'accent'].includes(src.overlay) ? src.overlay : (image ? 'dark' : 'none'),
+      width: src.width === 'full' ? 'full' : 'contained',
+      padding: ['small', 'large'].includes(src.padding) ? src.padding : 'medium',
+      fixed: Boolean(src.fixed),
+    };
+  }
+
+  function applyBackground(root, bg) {
+    if (!bg) return;
+    root.classList.add('ru-has-bg', 'ru-bg-' + bg.width, 'ru-bg-pad-' + bg.padding, 'ru-bg-ov-' + bg.overlay);
+    if (bg.fixed) root.classList.add('ru-bg-fixed');
+    if (bg.image) root.style.backgroundImage = "url('" + bg.image.replace(/'/g, '%27') + "')";
+    if (bg.color) root.style.backgroundColor = bg.color;
+    // Text colour follows the overlay (or the colour on its own), not the Rise block around it.
+    const dark = bg.overlay === 'dark' || (bg.overlay === 'none' && bg.color && !bg.image && inkFor(bg.color) === '#ffffff');
+    if (dark) root.classList.add('ru-on-dark');
+  }
+
   function renderComponent(doc, comp, ctx) {
     const type = comp && TYPES[comp.type];
     if (!type) return null;
     const data = Object.assign(type.defaults(), comp.data || {});
     const node = type.render(doc, data, Object.assign({ id: comp.id }, ctx || {}));
     const root = el(doc, 'div', { class: 'ru-c ru-c-' + comp.type, 'data-riseup-component': comp.id, 'data-riseup-ignore': '' }, [node]);
+    applyBackground(root, resolveBackground(data, ctx));
     return root;
   }
 
@@ -994,6 +1041,28 @@
 .ru-c.ru-on-dark .ru-feedback.is-right { color: #5fd08f; }
 .ru-c.ru-on-dark .ru-feedback.is-wrong { color: #ff8a88; }
 .ru-c.ru-on-dark .ru-rf-input { background: rgba(0,0,0,.25); }
+
+/* Block backgrounds */
+.ru-c.ru-has-bg { box-sizing: border-box; position: relative; isolation: isolate; background-size: cover; background-position: center; border-radius: var(--ru-radius); overflow: hidden; }
+.ru-c.ru-has-bg::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.ru-c.ru-bg-ov-light::before { background: rgba(255,255,255,.84); }
+.ru-c.ru-bg-ov-dark::before { background: linear-gradient(rgba(8,10,16,.55), rgba(8,10,16,.72)); }
+.ru-c.ru-bg-ov-accent::before { background: color-mix(in srgb, var(--ru-accent) 85%, transparent); }
+.ru-c.ru-bg-ov-accent { --ru-ink: var(--ru-accent-ink); --ru-muted: var(--ru-accent-ink); --ru-line: rgba(255,255,255,.3); --ru-soft: rgba(255,255,255,.12); --ru-card: rgba(255,255,255,.14); color: var(--ru-accent-ink); }
+.ru-c.ru-bg-ov-light { --ru-ink: #1d2330; --ru-muted: #4a5263; color: #1d2330; }
+.ru-c.ru-bg-pad-small { padding: 16px 18px; }
+.ru-c.ru-bg-pad-medium { padding: clamp(22px, 4vw, 40px); }
+.ru-c.ru-bg-pad-large { padding: clamp(36px, 8vw, 84px) clamp(22px, 5vw, 56px); }
+.ru-c.ru-bg-full { width: 100vw; margin-left: calc(50% - 50vw); border-radius: 0; padding-left: max(20px, calc((100vw - 780px) / 2)); padding-right: max(20px, calc((100vw - 780px) / 2)); }
+.ru-c.ru-bg-fixed { background-attachment: fixed; }
+.ru-c.ru-has-bg .ru-title, .ru-c.ru-has-bg .ru-q { color: inherit; }
+/* Keep buttons readable on dark and course-colour backgrounds */
+.ru-c.ru-on-dark .ru-btn-ghost, .ru-c.ru-bg-ov-accent .ru-btn-ghost { color: #fff; border-color: rgba(255,255,255,.85); }
+.ru-c.ru-bg-ov-accent .ru-btn:not(.ru-btn-ghost) { background: #fff; border-color: #fff; color: #1d2330; }
+.ru-c.ru-on-dark .ru-opts-list .ru-opt-badge, .ru-c.ru-bg-ov-accent .ru-opts-list .ru-opt-badge { color: #fff; background: rgba(255,255,255,.16); }
+.ru-c.ru-on-dark .ru-opt, .ru-c.ru-bg-ov-accent .ru-opt { color: inherit; }
+.ru-c.ru-has-bg.ru-on-dark .ru-st-affix, .ru-c.ru-bg-ov-accent .ru-st-affix, .ru-c.ru-has-bg.ru-on-dark .ru-stat-value, .ru-c.ru-bg-ov-accent .ru-stat-value { color: color-mix(in srgb, var(--ru-accent) 35%, #ffffff); }
+@media (hover: none) { .ru-c.ru-bg-fixed { background-attachment: scroll; } }
 
 /* Hero */
 .ru-c .ru-hero { position: relative; display: flex; align-items: center; color: #fff; background-size: cover; background-position: center; border-radius: var(--ru-radius); overflow: hidden; }
@@ -1250,7 +1319,7 @@
   return {
     TYPES, MARKER_RE, COMPONENT_CSS, ANIMATIONS,
     markerFor, newComponentId, renderComponent, themeCss, inkFor, safeUrl,
-    detectCourseTheme, applyCourseTheme,
+    detectCourseTheme, applyCourseTheme, BG_FIELDS, resolveBackground,
     // building blocks for blocks defined in other files
     _el: el, _shuffled: shuffled, _onVisible: onVisible, _reducedMotion: reducedMotion, _safeColor: safeColor, emitScore,
   };

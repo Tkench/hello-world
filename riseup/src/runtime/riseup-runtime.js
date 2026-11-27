@@ -90,7 +90,7 @@
         host.setAttribute(HOST_ATTR, h.id);
         host.style.display = 'none';
         var comp = components[h.id];
-        var node = comp ? RU.renderComponent(doc, comp, { courseKey: courseKey() }) : null;
+        var node = comp ? RU.renderComponent(doc, comp, { courseKey: courseKey(), bg: cfg.componentTheme && cfg.componentTheme.bg }) : null;
         if (node && look) RU.applyCourseTheme(node, look, { keepAccent: Boolean(cfg.componentTheme && cfg.componentTheme.accent) });
         if (node) {
           if (io && comp.type !== 'hero') { node.classList.add('ru-staged'); }

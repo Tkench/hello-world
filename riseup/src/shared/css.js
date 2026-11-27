@@ -16,6 +16,8 @@
     button: '.blocks-button__button, .block-wrapper a.brand--background, [data-block-id] a[class*="button"], [data-block-id] button[class*="button"]',
     link: '.block-wrapper a:not([class*="button"]), [data-block-id] a:not([class*="button"])',
     image: '.block-wrapper img, [data-block-id] img',
+    // Page-level wrappers that must be see-through for a course background to show.
+    pageWrappers: '#app, #app > div, main, .lesson-main, .blocks-lesson, .page-wrap, .lesson-blocks',
   };
 
   const SHADOWS = {
@@ -108,11 +110,43 @@
     }
     const imageRadius = safeNumber(gs.imageRadius, 0, 64);
     if (imageRadius !== null) out.push(rule(SELECTORS.image, [important('border-radius', imageRadius + 'px')]));
+    out.push(pageBackgroundCss(gs, editor, opts));
     if (typeof gs.customCss === 'string' && gs.customCss.trim()) {
       // Custom CSS is the author's own; only stop it closing a <style> element early.
       out.push('/* custom */\n' + gs.customCss.replace(/<\/style/gi, '<\\/style'));
     }
     return out.filter(Boolean).join('\n');
+  }
+
+  function safeCssUrl(u) {
+    if (typeof u !== 'string') return '';
+    const v = u.trim();
+    if (/^data:image\/(png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+$/.test(v) || /^https:\/\/[^\s'"()<>]+$/i.test(v) || /^(riseup\/)?media\/[\w.-]+$/.test(v)) return v;
+    return '';
+  }
+
+  /**
+   * One large image fixed behind the whole course. It's drawn on a fixed layer
+   * (not background-attachment, which phones ignore), and Rise's page wrappers
+   * are made see-through so it shows. Not applied in the editor.
+   */
+  function pageBackgroundCss(gs, editor, opts) {
+    const url = safeCssUrl((opts && opts.pageImageUrl) || gs.pageImage);
+    if (!url || editor) return '';
+    const tint = { light: 'rgba(255,255,255,.55)', dark: 'rgba(8,10,16,.55)' }[gs.pageOverlay] || '';
+    const layers = (tint ? 'linear-gradient(' + tint + ', ' + tint + '), ' : '') + "url('" + url + "')";
+    const out = [
+      'html, body { background: transparent !important; }',
+      'body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: ' + layers + ' center / cover no-repeat; }',
+      SELECTORS.pageWrappers.split(',').map((s) => s.trim()).join(', ') + ' { background: transparent !important; }',
+    ];
+    const blocks = SELECTORS.block + ', .lesson-header'; // the lesson title banner gets the same treatment
+    if (gs.pageBlocks === 'frosted' || !gs.pageBlocks) {
+      out.push(blocks + ' { background-color: rgba(255,255,255,.82) !important; -webkit-backdrop-filter: blur(8px) saturate(1.2); backdrop-filter: blur(8px) saturate(1.2); }');
+    } else if (gs.pageBlocks === 'clear') {
+      out.push(blocks + ' { background: transparent !important; }');
+    }
+    return out.join('\n');
   }
 
   /** Class name a text style is rendered with. */
@@ -175,7 +209,7 @@
 
   return {
     SELECTORS, SHADOWS, TEXT_SHADOWS,
-    buildCss, globalStylesCss, textStyleCss, styleClass, googleFontsUrl,
+    buildCss, globalStylesCss, textStyleCss, styleClass, googleFontsUrl, pageBackgroundCss,
     safeColor, safeFamily,
   };
 });

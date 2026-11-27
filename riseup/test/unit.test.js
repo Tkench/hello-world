@@ -983,3 +983,65 @@ test('scratch card can be revealed without scratching', () => {
   assert.ok(node.querySelector('.ru-scr-card').classList.contains('is-revealed'));
   assert.match(node.querySelector('[aria-live]').textContent, /1 in 3/);
 });
+
+// ------------------------------------------------------------------ backgrounds
+test('blocks use the course default background, their own, or none', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const png = 'data:image/png;base64,iVBORw0KGgo=';
+  const courseBg = { image: png, overlay: 'dark', width: 'full', padding: 'large' };
+  const plain = comps.renderComponent(doc, { id: 'a', type: 'flipcards', data: {} }, { bg: courseBg });
+  assert.ok(plain.classList.contains('ru-has-bg'));
+  assert.ok(plain.classList.contains('ru-bg-full') && plain.classList.contains('ru-bg-pad-large'));
+  assert.ok(plain.classList.contains('ru-on-dark'), 'dark overlay means light text');
+  assert.match(plain.style.backgroundImage, /data:image\/png/);
+  const none = comps.renderComponent(doc, { id: 'b', type: 'flipcards', data: { bgMode: 'none' } }, { bg: courseBg });
+  assert.equal(none.classList.contains('ru-has-bg'), false);
+  const own = comps.renderComponent(doc, { id: 'c', type: 'flipcards', data: { bgMode: 'custom', bgColor: '#fff3d6', bgOverlay: 'none', bgFixed: true } }, { bg: courseBg });
+  assert.equal(own.style.backgroundImage, '');
+  assert.equal(own.style.backgroundColor, 'rgb(255, 243, 214)');
+  assert.ok(own.classList.contains('ru-bg-fixed'));
+  assert.equal(own.classList.contains('ru-on-dark'), false, 'light colour keeps dark text');
+  const navy = comps.renderComponent(doc, { id: 'd', type: 'flipcards', data: { bgMode: 'custom', bgColor: '#102040', bgOverlay: 'none' } }, {});
+  assert.ok(navy.classList.contains('ru-on-dark'), 'dark colour on its own means light text');
+  const unsafe = comps.renderComponent(doc, { id: 'e', type: 'flipcards', data: { bgMode: 'custom', bgImage: 'javascript:x' } }, {});
+  assert.equal(unsafe.classList.contains('ru-has-bg'), false);
+  // The course's dark/light detection doesn't override a block's own background.
+  comps.applyCourseTheme(own, { dark: true, ink: '#000000' });
+  assert.equal(own.classList.contains('ru-on-dark'), false);
+});
+
+test('background images are packed into the published course', () => {
+  const png = 'data:image/png;base64,iVBORw0KGgo=';
+  const { config: rt, files } = pkg.externalizeMedia({ components: [{ id: 'a', type: 'hero', data: { bgMode: 'custom', bgImage: png } }], componentTheme: { bg: { image: png } } });
+  assert.equal(files.length, 1);
+  assert.equal(rt.components[0].data.bgImage, 'riseup/media/img-1.png');
+  assert.equal(rt.componentTheme.bg.image, 'riseup/media/img-1.png');
+});
+
+test('course background: one fixed image behind everything, not in the editor', () => {
+  const c = config.defaultCourseConfig();
+  assert.doesNotMatch(css.buildCss(c), /body::before/, 'nothing until an image is set');
+  c.globalStyles.pageImage = 'https://example.com/bg.jpg';
+  const out = css.buildCss(c);
+  assert.match(out, /body::before \{[^}]*position: fixed;[^}]*url\('https:\/\/example\.com\/bg\.jpg'\)/);
+  assert.match(out, /rgba\(255,255,255,\.55\)/, 'light overlay by default');
+  assert.match(out, /backdrop-filter: blur/, 'frosted blocks by default');
+  assert.doesNotMatch(css.buildCss(c, { editor: true }), /body::before/, 'editor left alone');
+  c.globalStyles.pageBlocks = 'solid';
+  assert.doesNotMatch(css.buildCss(c), /backdrop-filter/);
+  c.globalStyles.pageImage = "https://x.com/a.jpg') ; } body { display:none";
+  assert.doesNotMatch(css.buildCss(c), /display:none/, 'unsafe addresses refused');
+});
+
+test('course background is packed as a file in the published zip', async () => {
+  const zip = new JSZip();
+  zip.file('index.html', '<html><head></head><body></body></html>');
+  const cfg = config.defaultCourseConfig();
+  cfg.globalStyles.pageImage = 'data:image/jpeg;base64,/9j/4AAQ';
+  await pkg.patchCourseZip(zip, cfg, { runtimeJs: '', textRulesJs: '' });
+  assert.ok(zip.file('riseup/media/course-background.jpg'));
+  const cssText = await zip.file('riseup/riseup.css').async('string');
+  assert.match(cssText, /url\('media\/course-background\.jpg'\)/);
+  assert.doesNotMatch(cssText, /data:image/, 'not inlined');
+});

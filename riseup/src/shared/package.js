@@ -102,7 +102,7 @@
       }
       return v;
     };
-    const config = Object.assign({}, rtConfig, { components: walk(rtConfig.components || []), navigation: walk(rtConfig.navigation || { layout: 'rise' }) });
+    const config = Object.assign({}, rtConfig, { components: walk(rtConfig.components || []), navigation: walk(rtConfig.navigation || { layout: 'rise' }), componentTheme: walk(rtConfig.componentTheme || {}) });
     return { config, files };
   }
 
@@ -130,7 +130,14 @@
       fontCssHref = deps.googleFontsUrl(config.fonts);
     }
 
-    zip.file(dir + 'riseup/riseup.css', deps.buildCss(config));
+    // The course background goes in as a file next to the CSS (riseup/media/), not inline.
+    let pageImageUrl = '';
+    const pm = /^data:(image\/[a-z+.-]+);base64,([A-Za-z0-9+/=]+)$/.exec((config.globalStyles && config.globalStyles.pageImage) || '');
+    if (pm && MIME_EXT[pm[1]]) {
+      zip.file(dir + 'riseup/media/course-background.' + MIME_EXT[pm[1]], base64ToBytes(pm[2]));
+      pageImageUrl = 'media/course-background.' + MIME_EXT[pm[1]];
+    }
+    zip.file(dir + 'riseup/riseup.css', deps.buildCss(config, { pageImageUrl }));
     const media = externalizeMedia(runtimeConfig(config));
     for (const f of media.files) zip.file(dir + 'riseup/' + f.name, f.data);
     zip.file(dir + 'riseup/riseup-config.js', 'window.RISEUP_CONFIG = ' + JSON.stringify(media.config).replace(/</g, '\\u003c') + ';\n');

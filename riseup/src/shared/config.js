@@ -26,6 +26,9 @@
       linkColor: '',
       linkUnderline: '', // '' | always | hover | none
       imageRadius: null, // px
+      pageImage: '', // one fixed image behind the whole course
+      pageOverlay: 'light', // none | light | dark
+      pageBlocks: 'frosted', // how Rise's blocks sit on it: frosted | solid | clear
       customCss: '',
     };
   }
@@ -39,7 +42,7 @@
       textStyles: [], // see textRules.js for the shape
       textRules: [], // [{ id, text, styleId, matchCase, wholeWord }]
       components: [], // RiseUp blocks: [{ id, type, name, data }] (see components.js)
-      componentTheme: { accent: '', radius: 12, matchCourse: true }, // matchCourse: take colour, fonts and button shape from the Rise course
+      componentTheme: { accent: '', radius: 12, matchCourse: true, bg: {} }, // bg: course default block background // matchCourse: take colour, fonts and button shape from the Rise course
       animation: { type: 'none', duration: 700 }, // scroll animation for blocks
       navigation: { layout: 'rise', style: 'light', progress: true, logo: '', title: '' }, // see nav.js
       widget: { enabled: false, tools: { score: true }, title: '' }, // floating space, see widget.js
@@ -57,6 +60,7 @@
     out.globalStyles = Object.assign(defaultGlobalStyles(), (cfg && cfg.globalStyles) || {});
     for (const k of ['fonts', 'textStyles', 'textRules', 'components']) if (!Array.isArray(out[k])) out[k] = [];
     out.componentTheme = Object.assign(base.componentTheme, (cfg && cfg.componentTheme) || {});
+    out.componentTheme.bg = Object.assign({}, out.componentTheme.bg);
     out.animation = Object.assign(base.animation, (cfg && cfg.animation) || {});
     out.navigation = Object.assign(base.navigation, (cfg && cfg.navigation) || {});
     out.widget = Object.assign(base.widget, (cfg && cfg.widget) || {});
