@@ -14,6 +14,8 @@ Before building, Rise's current features were checked (November 2026) so RiseUp 
 | Colour | Colour fields with hex input; brand colours with Brands (beta) | Eyedropper that picks from anywhere on screen, saved palettes, recent colours, WCAG contrast checker |
 | Design templates | Fixed block types and layouts | Hero banner, stat row with counting numbers, timeline, quote card, section header |
 | Interactive blocks | Accordion, tabs, flashcards, labelled graphic, sorting, knowledge checks | Flip card carousel (3D carousel or stacked deck, with arrows, dots, swipe and keyboard), flip cards, image hotspots, put-in-order (drag or arrow buttons), think-then-reveal, before/after image slider, reflection with saved and downloadable answers |
+| Questions | Knowledge check and quiz blocks (scored, reported to the LMS) | Single and multiple choice practice questions in four styles (List, Tiles, Pills, Scenario speech bubble), with feedback per option, correct/partly right/incorrect feedback, 1–3 or unlimited attempts, show-the-answer and shuffle. Not reported to the LMS |
+| Navigation | Left sidebar menu | Optional top bar (lessons across the top, Lessons dropdown when there are many) or top bar with a full-screen numbered menu; light, dark or course-colour; logo, title and progress line. Built from Rise's lesson links; leaves the course unchanged if it can't find them |
 | Animation | None | Blocks fade, rise, zoom or slide in as learners scroll; respects the device's reduced-motion setting |
 
 ## Install (developer mode)
@@ -41,6 +43,7 @@ The interface follows the Omniplex Learning brand guidelines: Dark grey surfaces
 ## How it works
 
 - `src/content/`: the panel and live styling inside Rise. It never edits Rise's own content (Rise could save the extra markup). Inside the editor, styled phrases are shown with the CSS Custom Highlight API. In previews, they're wrapped in spans.
+- `src/shared/nav.js`: the top navigation. It rebuilds the menu from Rise's `#/lessons/…` links and hides Rise's sidebar only when it can tell it apart from lesson content.
 - `src/shared/components.js`: the blocks: form schema, defaults, rendering and styles for each type. Author text is always inserted as text, never HTML.
 - `src/runtime/riseup-runtime.js`: the script added to published courses (and run in Rise's Preview). It swaps block codes for blocks, runs scroll animations and applies text styles as Rise renders each lesson.
 - `src/shared/`: logic shared by all parts, covered by unit tests: CSS generation, text rules, colour contrast, XLIFF, package patching and font download.

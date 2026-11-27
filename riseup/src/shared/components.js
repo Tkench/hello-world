@@ -434,6 +434,172 @@
     },
   };
 
+  // ---------------------------------------------------------------- questions
+  const QUESTION_STYLES = [['list', 'List'], ['tiles', 'Tiles'], ['pills', 'Pills'], ['scenario', 'Scenario (speech bubble)']];
+  const ATTEMPT_OPTS = [['2', '2 attempts'], ['1', '1 attempt'], ['3', '3 attempts'], ['0', 'Unlimited']];
+
+  function questionFields(multiple) {
+    return [
+      { key: 'style', label: 'Style', type: 'select', options: QUESTION_STYLES },
+      { key: 'question', label: 'Question', type: 'textarea' },
+      { key: 'speaker', label: 'Speaker name (Scenario style)', type: 'text' },
+      { key: 'speakerImage', label: 'Speaker photo (Scenario style)', type: 'image' },
+      { key: 'options', label: multiple ? 'Options (tick every correct one)' : 'Options (tick the correct one)', type: 'list', itemLabel: 'Option', min: 2, max: 8, fields: [
+        { key: 'text', label: 'Option text', type: 'textarea' },
+        { key: 'correct', label: 'This is a correct answer', type: 'checkbox' },
+        { key: 'feedback', label: 'Feedback for this option', type: 'textarea' },
+        { key: 'image', label: 'Image (Tiles style)', type: 'image' },
+      ] },
+      { key: 'correctFeedback', label: 'Feedback when correct', type: 'textarea' },
+      multiple ? { key: 'partialFeedback', label: 'Feedback when partly correct', type: 'textarea' } : null,
+      { key: 'incorrectFeedback', label: 'Feedback when incorrect', type: 'textarea' },
+      { key: 'attempts', label: 'Attempts', type: 'select', options: ATTEMPT_OPTS },
+      { key: 'showAnswer', label: 'Show the correct answer after the last attempt', type: 'checkbox' },
+      { key: 'shuffle', label: 'Shuffle the options', type: 'checkbox' },
+    ].filter(Boolean);
+  }
+
+  function renderQuestion(doc, d, ctx, multiple) {
+    const id = 'ru-q-' + ((ctx && ctx.id) || 'x');
+    const style = ['list', 'tiles', 'pills', 'scenario'].includes(d.style) ? d.style : 'list';
+    const opts = (d.options || []).map((o, i) => ({ text: o.text || '', correct: Boolean(o.correct), feedback: o.feedback || '', image: safeUrl(o.image, 'image'), index: i }))
+      .filter((o) => o.text || o.image);
+    const order = d.shuffle ? shuffled(opts, (ctx && ctx.id) || 'q') : opts;
+    const maxAttempts = Number(d.attempts) || 0; // 0 = unlimited
+    let attempt = 0;
+
+    const inputs = [];
+    const rows = order.map((o, pos) => {
+      const inputId = id + '-o' + o.index;
+      const input = el(doc, 'input', { type: multiple ? 'checkbox' : 'radio', name: id, id: inputId, value: String(o.index), class: 'ru-opt-input' });
+      inputs.push({ input, o });
+      const badge = el(doc, 'span', { class: 'ru-opt-badge', 'aria-hidden': 'true', text: style === 'list' ? String.fromCharCode(65 + pos) : '' });
+      const mark = el(doc, 'span', { class: 'ru-opt-mark', 'aria-hidden': 'true' });
+      const tag = el(doc, 'span', { class: 'ru-opt-tag' });
+      const label = el(doc, 'label', { for: inputId, class: 'ru-opt' }, [
+        style === 'tiles' && o.image ? el(doc, 'img', { src: o.image, alt: '', class: 'ru-opt-img' }) : null,
+        el(doc, 'span', { class: 'ru-opt-row' }, [badge, el(doc, 'span', { class: 'ru-opt-text', text: o.text }), mark]),
+        tag,
+      ]);
+      return el(doc, 'div', { class: 'ru-opt-wrap' }, [input, label]);
+    });
+
+    const legend = el(doc, 'legend', { class: 'ru-q' + (style === 'scenario' ? ' ru-sr' : ''), text: d.question || '' });
+    const hint = el(doc, 'p', { class: 'ru-instr ru-qhint', text: multiple ? 'Select all that apply.' : 'Select one answer.' });
+    const fieldset = el(doc, 'fieldset', { class: 'ru-opts ru-opts-' + style }, [legend, hint, ...rows]);
+    const submit = el(doc, 'button', { type: 'button', class: 'ru-btn', text: 'Submit', disabled: true });
+    const retry = el(doc, 'button', { type: 'button', class: 'ru-btn ru-btn-ghost', text: 'Try again', hidden: true });
+    const fb = el(doc, 'div', { class: 'ru-qfb', tabindex: '-1', hidden: true });
+    const live = el(doc, 'p', { class: 'ru-sr', 'aria-live': 'polite' });
+
+    const selected = () => inputs.filter((x) => x.input.checked);
+    const refresh = () => {
+      submit.disabled = selected().length === 0;
+      inputs.forEach((x) => x.input.parentNode.classList.toggle('is-selected', x.input.checked));
+    };
+    inputs.forEach((x) => x.input.addEventListener('change', refresh));
+
+    function grade() {
+      const sel = selected();
+      const correctSet = opts.filter((o) => o.correct);
+      if (!multiple) return sel.length === 1 && sel[0].o.correct ? 'correct' : 'incorrect';
+      const right = sel.filter((x) => x.o.correct).length;
+      const wrong = sel.length - right;
+      if (right === correctSet.length && wrong === 0) return 'correct';
+      return right > 0 ? 'partial' : 'incorrect';
+    }
+
+    submit.addEventListener('click', () => {
+      attempt++;
+      const result = grade();
+      const outOfTries = maxAttempts > 0 && attempt >= maxAttempts;
+      const final = result === 'correct' || outOfTries;
+      const reveal = final && result !== 'correct' && d.showAnswer !== false;
+      inputs.forEach(({ input, o }) => {
+        input.disabled = true;
+        const wrap = input.parentNode;
+        wrap.classList.remove('is-right', 'is-wrong', 'is-answer');
+        if (input.checked) wrap.classList.add(o.correct ? 'is-right' : 'is-wrong');
+        else if (reveal && o.correct) wrap.classList.add('is-answer');
+        const tag = wrap.querySelector('.ru-opt-tag');
+        tag.textContent = input.checked ? (o.correct ? 'Correct' : 'Incorrect') : (reveal && o.correct ? 'Correct answer' : '');
+      });
+      const titles = { correct: 'Correct', partial: 'Partly right', incorrect: 'Not quite' };
+      const message = result === 'correct' ? d.correctFeedback : result === 'partial' ? (d.partialFeedback || d.incorrectFeedback) : d.incorrectFeedback;
+      // Explanations for what the learner chose, plus the right answers once revealed.
+      const explain = opts.filter((o) => o.feedback && (inputs.find((x) => x.o === o).input.checked || (reveal && o.correct)));
+      const triesLeft = maxAttempts > 0 ? maxAttempts - attempt : null;
+      fb.className = 'ru-qfb is-' + result;
+      fb.replaceChildren(...[
+        el(doc, 'p', { class: 'ru-qfb-title' }, [el(doc, 'span', { class: 'ru-qfb-icon', 'aria-hidden': 'true', text: result === 'correct' ? '✓' : result === 'partial' ? '½' : '✗' }), titles[result]]),
+        message ? el(doc, 'p', { class: 'ru-qfb-msg', text: message }) : null,
+        explain.length ? el(doc, 'ul', { class: 'ru-qfb-list' }, explain.map((o) => el(doc, 'li', { class: o.correct ? 'is-right' : 'is-wrong' }, [el(doc, 'strong', { text: o.text }), el(doc, 'span', { text: o.feedback })]))) : null,
+        !final ? el(doc, 'p', { class: 'ru-qfb-tries', text: triesLeft === null ? 'Have another go.' : triesLeft + (triesLeft === 1 ? ' attempt left.' : ' attempts left.') }) : null,
+      ].filter(Boolean));
+      fb.hidden = false;
+      submit.hidden = true;
+      retry.hidden = final;
+      live.textContent = titles[result] + '. ' + (message || '');
+      fb.focus({ preventScroll: true });
+    });
+
+    retry.addEventListener('click', () => {
+      inputs.forEach(({ input }) => {
+        input.disabled = false;
+        input.checked = false;
+        input.parentNode.classList.remove('is-right', 'is-wrong', 'is-answer', 'is-selected');
+        input.parentNode.querySelector('.ru-opt-tag').textContent = '';
+      });
+      fb.hidden = true;
+      retry.hidden = true;
+      submit.hidden = false;
+      submit.disabled = true;
+      (inputs[0] && inputs[0].input).focus();
+    });
+
+    const speakerImg = safeUrl(d.speakerImage, 'image');
+    const head = style === 'scenario'
+      ? el(doc, 'div', { class: 'ru-scn' }, [
+          el(doc, 'span', { class: 'ru-scn-avatar', 'aria-hidden': 'true' }, [speakerImg ? el(doc, 'img', { src: speakerImg, alt: '' }) : el(doc, 'span', { text: (d.speaker || '?').trim().charAt(0).toUpperCase() })]),
+          el(doc, 'div', { class: 'ru-scn-bubble' }, [d.speaker ? el(doc, 'p', { class: 'ru-scn-name', text: d.speaker }) : null, el(doc, 'p', { class: 'ru-scn-text', 'aria-hidden': 'true', text: d.question || '' })]),
+        ])
+      : null;
+
+    return el(doc, 'section', { class: 'ru-quiz ru-quiz-' + style }, [
+      head,
+      fieldset,
+      fb,
+      el(doc, 'div', { class: 'ru-actions' }, [submit, retry]),
+      live,
+    ]);
+  }
+
+  TYPES.single = {
+    label: 'Single choice question', kind: 'question',
+    description: 'One correct answer, in a List, Tiles, Pills or Scenario style, with feedback for every option.',
+    fields: questionFields(false),
+    defaults: () => ({ style: 'list', question: 'You spot a small fire in a bin. What should you do first?', speaker: 'Priya, team leader', speakerImage: '', options: [
+      { text: 'Raise the alarm', correct: true, feedback: 'Yes. Raising the alarm gets everyone moving and brings help, whatever happens next.', image: '' },
+      { text: 'Tackle it with the nearest extinguisher', correct: false, feedback: 'Only if you’re trained and it’s safe, and after the alarm is raised.', image: '' },
+      { text: 'Carry the bin outside', correct: false, feedback: 'Moving burning material can spread the fire and injure you.', image: '' },
+      { text: 'Finish what you’re doing, then report it', correct: false, feedback: 'Fires grow fast. Every second counts.', image: '' },
+    ], correctFeedback: 'That’s right. Raise the alarm first, every time.', incorrectFeedback: 'Not this time. Think about what protects the most people.', attempts: '2', showAnswer: true, shuffle: false }),
+    render(doc, d, ctx) { return renderQuestion(doc, d, ctx, false); },
+  };
+
+  TYPES.multiple = {
+    label: 'Multiple choice question', kind: 'question',
+    description: 'Several correct answers, in a List, Tiles, Pills or Scenario style, with partly-right feedback.',
+    fields: questionFields(true),
+    defaults: () => ({ style: 'tiles', question: 'Which of these should you report as a near miss?', speaker: 'Sam, site manager', speakerImage: '', options: [
+      { text: 'A pallet falls where someone was standing a minute earlier', correct: true, feedback: 'No one was hurt, but they could have been. That’s a near miss.', image: '' },
+      { text: 'A forklift brakes hard to avoid a pedestrian', correct: true, feedback: 'A close call between people and vehicles is always worth reporting.', image: '' },
+      { text: 'A colleague is 10 minutes late', correct: false, feedback: 'Lateness isn’t a safety event.', image: '' },
+      { text: 'A fire door is wedged open', correct: false, feedback: 'This is a hazard to report and fix straight away, not a near miss.', image: '' },
+    ], correctFeedback: 'Spot on. Near misses are warnings we can act on.', partialFeedback: 'You’re partly right. Check the feedback for each option.', incorrectFeedback: 'Not quite. A near miss is an event that could have caused harm.', attempts: '2', showAnswer: true, shuffle: false }),
+    render(doc, d, ctx) { return renderQuestion(doc, d, ctx, true); },
+  };
+
   TYPES.hotspots = {
     label: 'Image hotspots', kind: 'interactive',
     description: 'Numbered markers on an image that open a short explanation.',
@@ -788,7 +954,7 @@
     let accent = safeColor(theme && theme.accent) || '#2f6fde';
     if (accent.length === 4) accent = '#' + accent.slice(1).split('').map((c) => c + c).join('');
     const radius = Math.min(32, Math.max(0, Number(theme && theme.radius) || 12));
-    return '.ru-c { --ru-accent: ' + accent + '; --ru-accent-ink: ' + inkFor(accent) + '; --ru-accent-ink-large: ' + largeInkFor(accent) + '; --ru-radius: ' + radius + 'px; }';
+    return '.ru-c, .ru-nav, .ru-nav-overlay { --ru-accent: ' + accent + '; --ru-accent-ink: ' + inkFor(accent) + '; --ru-accent-ink-large: ' + largeInkFor(accent) + '; --ru-radius: ' + radius + 'px; }';
   }
 
   const ANIMATIONS = { none: 'None', fade: 'Fade in', rise: 'Rise up', zoom: 'Zoom in', slide: 'Slide in from the side' };
@@ -911,6 +1077,101 @@
 .ru-c .ru-fcc-dot.is-active::before { width: 22px; background: var(--ru-accent); }
 .ru-c .ru-fcc-count { color: var(--ru-muted); font-size: .85em; font-weight: 600; }
 @media (max-width: 520px) { .ru-c .ru-fcc-nav { position: absolute; z-index: 120; bottom: -54px; } .ru-c .ru-fcc-prev { left: 0; } .ru-c .ru-fcc-next { right: 0; } .ru-c .ru-fcc-card { width: 62%; margin-left: -31%; } }
+
+/* Questions */
+.ru-c .ru-opts { border: 0; margin: 0; padding: 0; min-width: 0; }
+.ru-c .ru-opts > .ru-q { padding: 0; margin-bottom: 2px; }
+.ru-c .ru-opt-wrap { position: relative; }
+.ru-c .ru-opt-input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.ru-c .ru-opt { display: flex; flex-direction: column; gap: 6px; cursor: pointer; transition: border-color .15s, background .15s, transform .15s, box-shadow .15s; }
+.ru-c .ru-opt-row { display: flex; align-items: center; gap: 12px; }
+.ru-c .ru-opt-text { flex: 1; white-space: pre-line; }
+.ru-c .ru-opt-input:focus-visible + .ru-opt { outline: 3px solid var(--ru-accent); outline-offset: 2px; }
+.ru-c .ru-opt-input:disabled + .ru-opt { cursor: default; }
+.ru-c .ru-opt-tag { font-size: .78em; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.ru-c .ru-opt-tag:empty { display: none; }
+.ru-c .ru-opt-mark { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--ru-line); display: grid; place-items: center; font: 800 12px/1 system-ui, sans-serif; color: #fff; transition: background .15s, border-color .15s; }
+.ru-c .ru-opts input[type=checkbox] + .ru-opt .ru-opt-mark { border-radius: 6px; }
+.ru-c .is-selected .ru-opt-mark { background: var(--ru-accent); border-color: var(--ru-accent); }
+.ru-c .is-selected .ru-opt-mark::after { content: "\\2713"; color: var(--ru-accent-ink); }
+.ru-c .ru-opts input[type=radio]:checked + .ru-opt .ru-opt-mark::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ru-accent-ink); }
+.ru-c .is-right .ru-opt { border-color: #1d7a46 !important; background: color-mix(in srgb, #1d7a46 10%, var(--ru-card)) !important; }
+.ru-c .is-right .ru-opt-mark { background: #1d7a46 !important; border-color: #1d7a46 !important; }
+.ru-c .is-right .ru-opt-mark::after { content: "\\2713" !important; width: auto !important; height: auto !important; background: none !important; color: #fff !important; }
+.ru-c .is-right .ru-opt-tag { color: #1d7a46; }
+.ru-c .is-wrong .ru-opt { border-color: #b3261e !important; background: color-mix(in srgb, #b3261e 8%, var(--ru-card)) !important; }
+.ru-c .is-wrong .ru-opt-mark { background: #b3261e !important; border-color: #b3261e !important; }
+.ru-c .is-wrong .ru-opt-mark::after { content: "\\2717" !important; width: auto !important; height: auto !important; background: none !important; color: #fff !important; }
+.ru-c .is-wrong .ru-opt-tag { color: #b3261e; }
+.ru-c .is-answer .ru-opt { border: 2px dashed #1d7a46 !important; }
+.ru-c .is-answer .ru-opt-tag { color: #1d7a46; }
+.ru-c.ru-on-dark .is-right .ru-opt-tag, .ru-c.ru-on-dark .is-answer .ru-opt-tag { color: #5fd08f; }
+.ru-c.ru-on-dark .is-wrong .ru-opt-tag { color: #ff8a88; }
+
+/* Style 1: List */
+.ru-c .ru-opts-list { display: flex; flex-direction: column; gap: 8px; }
+.ru-c .ru-opts-list .ru-opt { padding: 12px 14px; border-radius: var(--ru-radius); border: 2px solid var(--ru-line); background: var(--ru-card); }
+.ru-c .ru-opts-list .ru-opt:hover { border-color: var(--ru-accent); }
+.ru-c .ru-opts-list .ru-opt-badge { flex: none; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--ru-soft); color: var(--ru-accent); font-weight: 800; }
+.ru-c .ru-opts-list .is-selected .ru-opt { border-color: var(--ru-accent); }
+.ru-c .ru-opts-list .is-selected .ru-opt-badge { background: var(--ru-accent); color: var(--ru-accent-ink); }
+.ru-c .ru-opts-list .ru-opt-tag { padding-left: 42px; }
+
+/* Style 2: Tiles */
+.ru-c .ru-opts-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.ru-c .ru-opts-tiles .ru-opt { height: 100%; padding: 14px; border-radius: var(--ru-radius); border: 2px solid transparent; background: var(--ru-soft); box-shadow: 0 2px 6px rgba(0,0,0,.06); }
+.ru-c .ru-opts-tiles .ru-opt:hover { transform: translateY(-2px); box-shadow: 0 10px 22px rgba(0,0,0,.12); }
+.ru-c .ru-opts-tiles .ru-opt-row { align-items: flex-start; flex-direction: row-reverse; }
+.ru-c .ru-opts-tiles .ru-opt-text { font-weight: 600; }
+.ru-c .ru-opts-tiles .ru-opt-badge { display: none; }
+.ru-c .ru-opts-tiles .ru-opt-img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: calc(var(--ru-radius) - 4px); }
+.ru-c .ru-opts-tiles .is-selected .ru-opt { border-color: var(--ru-accent); background: color-mix(in srgb, var(--ru-accent) 10%, var(--ru-card)); }
+
+/* Style 3: Pills */
+.ru-c .ru-opts-pills { display: flex; flex-wrap: wrap; gap: 10px; }
+.ru-c .ru-opts-pills > .ru-q { width: 100%; }
+.ru-c .ru-opts-pills .ru-opt { flex-direction: row; align-items: center; padding: 10px 18px 10px 12px; border-radius: 999px; border: 2px solid var(--ru-accent); color: var(--ru-accent); background: var(--ru-card); font-weight: 700; }
+.ru-c .ru-opts-pills .ru-opt-badge { display: none; }
+.ru-c .ru-opts-pills .ru-opt-mark { width: 20px; height: 20px; order: -1; border-color: currentColor; }
+.ru-c .ru-opts-pills .ru-opt-row { gap: 8px; }
+.ru-c .ru-opts-pills .ru-opt-row .ru-opt-mark { order: -1; }
+.ru-c .ru-opts-pills .ru-opt:hover { background: color-mix(in srgb, var(--ru-accent) 10%, var(--ru-card)); }
+.ru-c .ru-opts-pills .is-selected .ru-opt { background: var(--ru-accent); color: var(--ru-accent-ink); }
+.ru-c .ru-opts-pills .is-selected .ru-opt-mark { border-color: var(--ru-accent-ink); }
+.ru-c .ru-opts-pills .is-right .ru-opt, .ru-c .ru-opts-pills .is-wrong .ru-opt { color: var(--ru-ink); }
+.ru-c .ru-opts-pills .ru-opt-tag { display: none; }
+
+/* Style 4: Scenario */
+.ru-c .ru-scn { display: flex; align-items: flex-end; gap: 12px; margin-bottom: 14px; }
+.ru-c .ru-scn-avatar { flex: none; width: 52px; height: 52px; border-radius: 50%; overflow: hidden; display: grid; place-items: center; background: var(--ru-accent); color: var(--ru-accent-ink); font-weight: 800; font-size: 1.3em; }
+.ru-c .ru-scn-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.ru-c .ru-scn-bubble { position: relative; padding: 14px 18px; border-radius: 18px 18px 18px 4px; background: var(--ru-soft); max-width: 85%; }
+.ru-c .ru-scn-name { font-size: .8em; font-weight: 700; color: var(--ru-accent); margin-bottom: 2px; }
+.ru-c .ru-scn-text { font-size: 1.08em; font-weight: 600; white-space: pre-line; }
+.ru-c .ru-qhint { width: 100%; margin-bottom: 10px; grid-column: 1 / -1; }
+.ru-c .ru-quiz-scenario .ru-qhint { text-align: right; margin-bottom: 4px; }
+.ru-c .ru-quiz-scenario .ru-qhint::before { content: "How do you reply? "; font-weight: 700; }
+.ru-c .ru-opts-scenario { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.ru-c .ru-opts-scenario .ru-opt-wrap { max-width: 85%; }
+.ru-c .ru-opts-scenario .ru-opt { padding: 11px 16px; border-radius: 18px 18px 4px 18px; border: 2px solid var(--ru-accent); background: var(--ru-card); }
+.ru-c .ru-opts-scenario .ru-opt-badge { display: none; }
+.ru-c .ru-opts-scenario .is-selected .ru-opt { background: var(--ru-accent); color: var(--ru-accent-ink); }
+.ru-c .ru-opts-scenario .is-selected .ru-opt-mark { border-color: var(--ru-accent-ink); }
+.ru-c .ru-opts-scenario .is-right .ru-opt, .ru-c .ru-opts-scenario .is-wrong .ru-opt { color: var(--ru-ink); }
+
+/* Question feedback */
+.ru-c .ru-qfb { margin-top: 16px; padding: 16px 18px; border-radius: var(--ru-radius); border-left: 6px solid; background: var(--ru-soft); outline: none; animation: ru-in .35s ease; }
+.ru-c .ru-qfb.is-correct { border-color: #1d7a46; }
+.ru-c .ru-qfb.is-partial { border-color: #b26a00; }
+.ru-c .ru-qfb.is-incorrect { border-color: #b3261e; }
+.ru-c .ru-qfb-title { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.1em; font-family: var(--ru-heading-font, inherit); }
+.ru-c .ru-qfb-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: #fff; font: 800 14px/1 system-ui, sans-serif; }
+.ru-c .is-correct .ru-qfb-icon { background: #1d7a46; } .ru-c .is-partial .ru-qfb-icon { background: #b26a00; } .ru-c .is-incorrect .ru-qfb-icon { background: #b3261e; }
+.ru-c .ru-qfb-msg { margin-top: 8px; }
+.ru-c .ru-qfb-list { list-style: none; margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.ru-c .ru-qfb-list li { display: flex; flex-direction: column; padding: 8px 12px; border-radius: 8px; background: var(--ru-card); border-left: 3px solid; font-size: .95em; }
+.ru-c .ru-qfb-list li.is-right { border-color: #1d7a46; } .ru-c .ru-qfb-list li.is-wrong { border-color: #b3261e; }
+.ru-c .ru-qfb-tries { margin-top: 8px; color: var(--ru-muted); font-weight: 600; font-size: .9em; }
 
 /* Hotspots */
 .ru-c .ru-hs-stage { position: relative; border-radius: var(--ru-radius); }

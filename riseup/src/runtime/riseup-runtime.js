@@ -125,6 +125,7 @@
         mountMarkers(doc.body);
         animateBlocks();
         if (o.textRules !== false) RU.wrapTextRules(doc.body, cfg.textRules || [], cfg.textStyles || [], { skipEditable: true });
+        if (nav) nav.refresh();
       } finally {
         observer.observe(doc.body, { childList: true, subtree: true, characterData: true });
       }
@@ -135,12 +136,24 @@
       (win.requestAnimationFrame || setTimeout)(apply);
     }
     var observer = new MutationObserver(schedule);
+    var nav = null;
+    if (RU.startNav && cfg.navigation && cfg.navigation.layout && cfg.navigation.layout !== 'rise') {
+      nav = RU.startNav(doc, cfg.navigation, {
+        look: true,
+        applyLook: function (n) {
+          var look = matchCourse ? RU.detectCourseTheme(doc, null) : {};
+          delete look.dark; delete look.ink;
+          RU.applyCourseTheme(n, look, { keepAccent: Boolean(theme.accent && cfg.componentTheme && cfg.componentTheme.accent) });
+        },
+      });
+    }
     apply();
 
     return {
       refresh: schedule,
       stop: function () {
         observer.disconnect();
+        if (nav) nav.stop();
         if (io) io.disconnect();
         mounted.forEach(function (m) {
           if (m.node && m.node.parentNode) m.node.parentNode.removeChild(m.node);

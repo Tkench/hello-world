@@ -369,3 +369,151 @@ test('flip card carousel without looping stops at the ends', () => {
   node.querySelector('.ru-fcc-next').click();
   assert.equal(node.querySelector('.ru-fcc-next').disabled, true);
 });
+
+function answer(node, texts) {
+  for (const w of node.querySelectorAll('.ru-opt-wrap')) {
+    const input = w.querySelector('input');
+    const want = texts.includes(w.querySelector('.ru-opt-text').textContent);
+    if (input.checked !== want) { input.checked = want; input.dispatchEvent(new input.ownerDocument.defaultView.Event('change')); }
+  }
+  Array.from(node.querySelectorAll('button')).find((b) => b.textContent === 'Submit').click();
+}
+const qbtn = (node, label) => Array.from(node.querySelectorAll('button')).find((b) => b.textContent === label);
+
+test('single choice: feedback, attempts and showing the answer', () => {
+  const dom = new JSDOM('<!doctype html><body></body>', { pretendToBeVisual: true });
+  const doc = dom.window.document;
+  for (const style of ['list', 'tiles', 'pills', 'scenario']) {
+    const data = Object.assign(comps.TYPES.single.defaults(), { style, attempts: '2', showAnswer: true });
+    const node = comps.renderComponent(doc, { id: 'q-' + style, type: 'single', data });
+    doc.body.appendChild(node);
+    assert.equal(node.querySelectorAll('input[type=radio]').length, 4, style);
+    assert.equal(qbtn(node, 'Submit').disabled, true, 'submit waits for an answer');
+    answer(node, ['Carry the bin outside']);
+    const fb = node.querySelector('.ru-qfb');
+    assert.equal(fb.hidden, false);
+    assert.match(fb.textContent, /Not quite/);
+    assert.match(fb.textContent, /Moving burning material/, 'option feedback shown');
+    assert.match(fb.textContent, /1 attempt left/);
+    assert.equal(node.querySelector('.is-answer'), null, 'answer not revealed while attempts remain');
+    qbtn(node, 'Try again').click();
+    answer(node, ['Finish what you’re doing, then report it']);
+    assert.equal(qbtn(node, 'Try again').hidden, true, 'no more attempts');
+    assert.match(node.querySelector('.is-answer .ru-opt-text').textContent, /Raise the alarm/, 'correct answer revealed');
+    assert.match(node.querySelector('.ru-qfb').textContent, /Raising the alarm gets everyone moving/);
+  }
+});
+
+test('single choice: correct first time', () => {
+  const dom = new JSDOM('<!doctype html><body></body>', { pretendToBeVisual: true });
+  const doc = dom.window.document;
+  const node = comps.renderComponent(doc, { id: 'q1', type: 'single', data: comps.TYPES.single.defaults() });
+  doc.body.appendChild(node);
+  answer(node, ['Raise the alarm']);
+  assert.match(node.querySelector('.ru-qfb').className, /is-correct/);
+  assert.match(node.querySelector('.ru-qfb').textContent, /Raise the alarm first, every time/);
+  assert.ok(node.querySelectorAll('input:disabled').length === 4, 'locked after answering');
+});
+
+test('multiple choice: correct, partly right and incorrect', () => {
+  const dom = new JSDOM('<!doctype html><body></body>', { pretendToBeVisual: true });
+  const doc = dom.window.document;
+  const make = () => { const n = comps.renderComponent(doc, { id: 'm' + Math.random(), type: 'multiple', data: Object.assign(comps.TYPES.multiple.defaults(), { attempts: '0' }) }); doc.body.appendChild(n); return n; };
+  const a = make();
+  assert.equal(a.querySelectorAll('input[type=checkbox]').length, 4);
+  answer(a, ['A pallet falls where someone was standing a minute earlier', 'A forklift brakes hard to avoid a pedestrian']);
+  assert.match(a.querySelector('.ru-qfb').className, /is-correct/);
+  const b = make();
+  answer(b, ['A pallet falls where someone was standing a minute earlier', 'A colleague is 10 minutes late']);
+  assert.match(b.querySelector('.ru-qfb').className, /is-partial/);
+  assert.match(b.querySelector('.ru-qfb').textContent, /partly right/);
+  assert.match(b.querySelector('.ru-qfb').textContent, /Have another go/, 'unlimited attempts');
+  const c = make();
+  answer(c, ['A colleague is 10 minutes late']);
+  assert.match(c.querySelector('.ru-qfb').className, /is-incorrect/);
+});
+
+test('shuffled options keep their own feedback', () => {
+  const dom = new JSDOM('<!doctype html><body></body>', { pretendToBeVisual: true });
+  const doc = dom.window.document;
+  const node = comps.renderComponent(doc, { id: 'sh', type: 'single', data: Object.assign(comps.TYPES.single.defaults(), { shuffle: true }) });
+  doc.body.appendChild(node);
+  const order = Array.from(node.querySelectorAll('.ru-opt-text')).map((e) => e.textContent);
+  assert.notEqual(order[0] + order[1] + order[2] + order[3], comps.TYPES.single.defaults().options.map((o) => o.text).join(''));
+  answer(node, ['Raise the alarm']);
+  assert.match(node.querySelector('.ru-qfb').className, /is-correct/);
+});
+
+// ------------------------------------------------------------------ navigation
+const navLib = require('../src/shared/nav.js');
+const RISE_LIKE = `<!doctype html><html><head><title>Fire Safety Basics</title></head><body>
+  <div id="app">
+    <aside class="nav-sidebar" style="position:fixed;left:0;top:0;width:300px">
+      <a href="#/">Fire Safety Basics</a>
+      <a href="#/lessons/aaa">Welcome 100%</a>
+      <a href="#/lessons/bbb">Spotting hazards</a>
+      <a href="#/lessons/ccc">Reporting Completed</a>
+    </aside>
+    <main id="main" style="margin-left:300px"><section data-block-id="b1"><p>Lesson text</p></section></main>
+  </div></body></html>`;
+
+test('navigation reads lessons from Rise links', () => {
+  const dom = new JSDOM(RISE_LIKE, { url: 'https://lms.example/course/index.html#/lessons/bbb' });
+  const lessons = navLib.collectLessons(dom.window.document);
+  assert.deepEqual(lessons.map((l) => [l.id, l.title]), [['aaa', 'Welcome'], ['bbb', 'Spotting hazards'], ['ccc', 'Reporting']]);
+  assert.equal(navLib.findSidebar(dom.window.document, lessons).className, 'nav-sidebar');
+});
+
+test('top bar replaces the sidebar, marks the current lesson, and can be undone', () => {
+  const dom = new JSDOM(RISE_LIKE, { url: 'https://lms.example/course/index.html#/lessons/bbb' });
+  const doc = dom.window.document;
+  const nav = navLib.startNav(doc, { layout: 'topbar', style: 'dark', progress: true });
+  const bar = doc.querySelector('nav.ru-nav');
+  assert.ok(bar && bar.classList.contains('ru-nav-dark'));
+  assert.equal(bar.querySelector('.ru-nav-home span').textContent, 'Fire Safety Basics');
+  assert.deepEqual(Array.from(bar.querySelectorAll('.ru-nav-links a')).map((a) => a.textContent), ['Welcome', 'Spotting hazards', 'Reporting']);
+  assert.equal(bar.querySelector('.ru-nav-links [aria-current="page"]').textContent, 'Spotting hazards');
+  assert.ok(doc.querySelector('.nav-sidebar').classList.contains('ru-nav-hidden'));
+  assert.equal(doc.getElementById('main').style.getPropertyValue('margin-left'), '0px', 'content no longer pushed right');
+  assert.equal(bar.querySelector('.ru-nav-progress').style.width, (2 / 3 * 100) + '%');
+  dom.window.location.hash = '#/lessons/ccc';
+  dom.window.dispatchEvent(new dom.window.HashChangeEvent('hashchange'));
+  assert.equal(bar.querySelector('[aria-current="page"]').textContent, 'Reporting');
+  nav.stop();
+  assert.equal(doc.querySelector('.ru-nav'), null);
+  assert.equal(doc.querySelector('.nav-sidebar').classList.contains('ru-nav-hidden'), false);
+  assert.equal(doc.getElementById('main').style.marginLeft, '300px', 'original layout restored');
+});
+
+test('full-screen menu opens, lists numbered lessons and closes with Escape', () => {
+  const dom = new JSDOM(RISE_LIKE, { url: 'https://lms.example/course/index.html#/lessons/aaa' });
+  const doc = dom.window.document;
+  navLib.startNav(doc, { layout: 'overlay', style: 'brand', title: 'Custom title' });
+  const overlay = doc.getElementById('ru-nav-overlay');
+  assert.equal(overlay.hidden, true);
+  assert.equal(doc.querySelector('.ru-nav-home span').textContent, 'Custom title');
+  const btn = doc.querySelector('[aria-controls="ru-nav-overlay"]');
+  btn.click();
+  assert.equal(overlay.hidden, false);
+  assert.equal(btn.getAttribute('aria-expanded'), 'true');
+  assert.deepEqual(Array.from(overlay.querySelectorAll('a')).map((a) => a.textContent), ['01Welcome', '02Spotting hazards', '03Reporting']);
+  doc.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape' }));
+  assert.equal(overlay.hidden, true);
+});
+
+test('navigation leaves the course alone when it can\'t find lessons', () => {
+  const dom = new JSDOM('<!doctype html><body><main><p>No lessons here</p></main></body>', { url: 'https://x.example/#/' });
+  const nav = navLib.startNav(dom.window.document, { layout: 'topbar' });
+  assert.equal(dom.window.document.querySelector('.ru-nav'), null);
+  nav.stop();
+  assert.equal(navLib.startNav(dom.window.document, { layout: 'rise' }).refresh(), undefined);
+});
+
+test('the sidebar is not hidden when it can\'t be told apart from lesson content', () => {
+  const dom = new JSDOM(`<!doctype html><body><main><section data-block-id="x">
+    <a href="#/lessons/a">One</a><a href="#/lessons/b">Two</a></section></main></body>`, { url: 'https://x.example/#/' });
+  const doc = dom.window.document;
+  navLib.startNav(doc, { layout: 'topbar' });
+  assert.ok(doc.querySelector('.ru-nav'), 'menu still added');
+  assert.equal(doc.querySelectorAll('.ru-nav-hidden').length, 0, 'nothing hidden');
+});

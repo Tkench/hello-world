@@ -257,6 +257,8 @@
     section: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 5h12M2 8h8M2 11h12"/></svg>',
     flipcards: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="3" width="7" height="10" rx="1.5"/><path d="M11.5 5.5c1.2.6 2 1.6 2 2.5s-.8 1.9-2 2.5" stroke-linecap="round"/></svg>',
     flipcarousel: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="5" y="3" width="6" height="10" rx="1.4"/><path d="M3 5v6M13 5v6" stroke-linecap="round"/></svg>',
+    single: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="4.5" cy="5" r="2"/><circle cx="4.5" cy="11" r="2"/><circle cx="4.5" cy="11" r=".6" fill="currentColor"/><path d="M8.5 5h5M8.5 11h5" stroke-linecap="round"/></svg>',
+    multiple: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="2.5" y="3" width="4" height="4" rx="1"/><rect x="2.5" y="9" width="4" height="4" rx="1"/><path d="M3.5 5l.8.8 1.4-1.6M3.5 11l.8.8 1.4-1.6M8.5 5h5M8.5 11h5" stroke-linecap="round"/></svg>',
     hotspots: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2.5" width="12" height="11" rx="2"/><circle cx="6" cy="7" r="1.5" fill="currentColor"/><circle cx="10.5" cy="9.5" r="1.5" fill="currentColor"/></svg>',
     sort: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 4h7M6 8h7M6 12h7M3 3.5v9M2 11l1 1.5L4 11"/></svg>',
     reveal: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/></svg>',
@@ -318,6 +320,8 @@
     const d = h('details', { class: 'acc', open: isOpen },
       h('summary', null, title, count ? h('span', { class: 'count' }, count) : null),
       h('div', { class: 'acc-body' }, body));
+    // Record the open section on click too: the toggle event comes a moment later.
+    d.firstChild.addEventListener('click', () => { openSection[tab] = d.open ? null : id; });
     d.addEventListener('toggle', () => {
       if (d.open) {
         openSection[tab] = id;
@@ -334,6 +338,7 @@
   function stylesTab() {
     const gs = state.config.globalStyles;
     const anim = state.config.animation;
+    const nav = state.config.navigation;
     const set = (k) => (v) => { gs[k] = v; saveConfig(); };
     const setAnim = (k) => (v) => { anim[k] = v; saveConfig(); };
     const T = 'styles';
@@ -348,6 +353,16 @@
         field('Blocks appear with', selectInput(anim.type, Object.entries(RU.ANIMATIONS), setAnim('type'))),
         field('Speed', selectInput(String(anim.duration), [['450', 'Quick'], ['700', 'Normal'], ['1100', 'Slow']], (v) => setAnim('duration')(Number(v)))),
         h('p', { class: 'empty' }, 'Shows in Preview and the published course. Learners who turn off motion on their device don’t see it.'),
+      ]),
+      acc(T, 'nav', 'Course navigation', [
+        field('Menu', selectInput(nav.layout, Object.entries(RU.NAV_LAYOUTS), (v) => { nav.layout = v; saveConfig(); panel.render(); })),
+        nav.layout !== 'rise' ? [
+          field('Bar colour', selectInput(nav.style, [['light', 'Light'], ['dark', 'Dark'], ['brand', 'Course colour']], (v) => { nav.style = v; saveConfig(); })),
+          h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: nav.progress !== false, onchange: (e) => { nav.progress = e.target.checked; saveConfig(); } }), 'Show a progress line'),
+          field('Title', h('input', { type: 'text', value: nav.title || '', placeholder: 'Course title', oninput: (e) => { nav.title = e.target.value; saveConfig({ silent: true }); } })),
+          field('Logo', imageInput(nav.logo, (v) => { nav.logo = v; saveConfig(); }), 'stack'),
+          h('p', { class: 'empty' }, 'Replaces Rise\u2019s left sidebar with a menu across the top. See it in Preview and the published course.'),
+        ] : null,
       ]),
       acc(T, 'buttons', 'Buttons', [
         field('Corner radius', numberInput(gs.buttonRadius, set('buttonRadius'), { min: 0, max: 64 })),
@@ -511,6 +526,8 @@
       h('div', { class: 'gallery' }, entries.filter(([, d]) => d.kind === 'template').map(tile)),
       h('p', { class: 'group-label' }, 'Interactive'),
       h('div', { class: 'gallery' }, entries.filter(([, d]) => d.kind === 'interactive').map(tile)),
+      h('p', { class: 'group-label' }, 'Questions'),
+      h('div', { class: 'gallery' }, entries.filter(([, d]) => d.kind === 'question').map(tile)),
       h('div', { style: 'margin-top:14px' }, acc(T, 'look', 'Block look', [
         h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: theme.matchCourse !== false, onchange: (e) => { theme.matchCourse = e.target.checked; saveConfig(); panel.render(); } }), 'Match the course\u2019s colour, fonts and buttons'),
         h('p', { class: 'empty' }, theme.matchCourse !== false

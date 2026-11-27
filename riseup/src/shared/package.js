@@ -41,6 +41,7 @@
       '<script src="riseup/riseup-config.js"></script>',
       '<script src="riseup/text-rules.js"></script>',
       '<script src="riseup/components.js"></script>',
+      '<script src="riseup/nav.js"></script>',
       '<script src="riseup/riseup-runtime.js"></script>',
       END].join('\n');
     if (!/<\/head>/i.test(clean) || !/<\/body>/i.test(clean)) throw new Error('The course page has no </head> or </body> tag, so RiseUp could not add its styling.');
@@ -55,6 +56,7 @@
       components: config.components || [],
       componentTheme: config.componentTheme || {},
       animation: config.animation || { type: 'none' },
+      navigation: config.navigation || { layout: 'rise' },
       blockSelector: deps.SELECTORS.block,
     };
   }
@@ -95,7 +97,7 @@
       }
       return v;
     };
-    const config = Object.assign({}, rtConfig, { components: walk(rtConfig.components || []) });
+    const config = Object.assign({}, rtConfig, { components: walk(rtConfig.components || []), navigation: walk(rtConfig.navigation || { layout: 'rise' }) });
     return { config, files };
   }
 
@@ -129,6 +131,7 @@
     zip.file(dir + 'riseup/riseup-config.js', 'window.RISEUP_CONFIG = ' + JSON.stringify(media.config).replace(/</g, '\\u003c') + ';\n');
     zip.file(dir + 'riseup/text-rules.js', assets.textRulesJs);
     zip.file(dir + 'riseup/components.js', assets.componentsJs || '');
+    zip.file(dir + 'riseup/nav.js', assets.navJs || '');
     zip.file(dir + 'riseup/riseup-runtime.js', assets.runtimeJs);
     zip.file(index, injectIntoHtml(html, { fontCssHref }));
     return { index, dir, fontsEmbedded: Boolean(assets.fontCss) };

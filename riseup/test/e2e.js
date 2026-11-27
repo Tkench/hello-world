@@ -23,14 +23,16 @@ const MOCK = (editable) => `<!doctype html><html><head><title>Fire Safety Basics
 h2{font-family:Georgia,serif}
 .blocks-button__button{display:inline-block;padding:10px 20px;border-radius:4px}
 .block-wrapper.dark{background:#1f2430;color:#f0f0f0}</style></head>
-<body><div class="blocks-lesson">
+<body>${editable ? '' : `<aside class="nav-sidebar" style="position:fixed;left:0;top:0;bottom:0;width:280px;background:#fff;box-shadow:1px 0 0 #ddd;padding:20px">
+<a href="#/">Fire Safety Basics</a><br><a href="#/lessons/l1">Welcome</a><br><a href="#/lessons/l2">Spotting hazards</a><br><a href="#/lessons/l3">Reporting</a><br><a href="#/lessons/l4">Fire drills</a></aside>`}
+<main style="${editable ? '' : 'margin-left:280px'}"><div class="blocks-lesson">
 <section class="block-wrapper" data-block-id="b1"><h2>Fire safety at work</h2>
 <p ${editable ? 'contenteditable="true"' : ''} id="para">Fire safety matters. Report every fire safety issue to Acme facilities.</p></section>
 ${markers.map((m, i) => `<section class="block-wrapper${i === 1 ? ' dark' : ''}" data-block-id="m${i}"><p ${editable ? 'contenteditable="true"' : ''}>${m}</p></section>`).join('\n')}
 <section class="block-wrapper" data-block-id="b2"><a class="blocks-button__button brand--background" href="#">Continue</a>
 <p><a href="#x">Read the policy</a></p></section>
 <section class="block-wrapper" data-block-id="b3"><p>More content below.</p></section>
-</div></body></html>`;
+</div></main></body></html>`;
 
 (async () => {
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'riseup-e2e-'));
@@ -89,6 +91,9 @@ ${markers.map((m, i) => `<section class="block-wrapper${i === 1 ? ' dark' : ''}"
   await page.waitForTimeout(100); // the other section closes on the toggle event
   assert.equal(await panel.locator('details.acc[open]').count(), 1, 'one section open at a time');
   await panel.locator('label.field', { hasText: 'Blocks appear with' }).locator('select').selectOption('rise');
+  await panel.locator('summary', { hasText: 'Course navigation' }).click();
+  await panel.locator('label.field', { hasText: 'Menu' }).locator('select').selectOption('topbar');
+  await panel.locator('label.field', { hasText: 'Bar colour' }).locator('select').selectOption('dark');
   await shot(page, '1-styles');
 
   // ---- Text
@@ -165,7 +170,7 @@ ${markers.map((m, i) => `<section class="block-wrapper${i === 1 ? ' dark' : ''}"
   // ================================================================ preview
   const preview = await ctx.newPage();
   preview.on('pageerror', (e) => errors.push('preview: ' + e.message));
-  await preview.goto('https://rise.articulate.com/share/TESTCOURSE123#/lessons/1');
+  await preview.goto('https://rise.articulate.com/share/TESTCOURSE123#/lessons/l2');
   await preview.waitForSelector('.ru-c-flipcards .ru-flip');
   assert.equal(await preview.locator('.ru-c').count(), 2, 'known codes become blocks');
   assert.equal(await preview.evaluate(() => Array.from(document.querySelectorAll('p')).filter((p) => p.textContent.includes('[[RiseUp') && p.offsetParent !== null).length), 0, 'no codes visible to learners');
@@ -187,6 +192,14 @@ ${markers.map((m, i) => `<section class="block-wrapper${i === 1 ? ' dark' : ''}"
   assert.equal(await preview.$eval('.ru-c-stats', (el) => el.classList.contains('ru-on-dark')), true, 'block on a dark background adapts');
   assert.equal(await preview.$eval('.ru-c-stats .ru-stat-label', (el) => getComputedStyle(el).color), 'rgba(255, 255, 255, 0.75)');
   assert.equal(await preview.locator('#para span[data-riseup-rule]').count(), 1);
+  // Top navigation replaces Rise's sidebar.
+  await preview.locator('nav.ru-nav.ru-nav-dark').waitFor();
+  assert.equal(await preview.locator('.nav-sidebar').isVisible(), false, 'Rise sidebar hidden');
+  assert.equal(await preview.locator('.ru-nav-links [aria-current="page"]').textContent(), 'Spotting hazards');
+  assert.ok((await preview.locator('[data-block-id="b1"]').boundingBox()).x < 400, 'content re-centred without the sidebar');
+  await preview.locator('.ru-nav-links a', { hasText: 'Reporting' }).click();
+  await preview.waitForFunction(() => location.hash === '#/lessons/l3');
+  assert.equal(await preview.locator('.ru-nav-links [aria-current="page"]').textContent(), 'Reporting');
   await preview.waitForTimeout(1600);
   await shot(preview, '7-preview', { fullPage: true });
 
@@ -219,6 +232,8 @@ ${markers.map((m, i) => `<section class="block-wrapper${i === 1 ? ' dark' : ''}"
   lms.on('pageerror', (e) => errors.push('published: ' + e.message));
   await lms.goto('file://' + path.join(dir, 'scormcontent/index.html'));
   await lms.waitForSelector('.ru-c-stats .ru-stat');
+  await lms.locator('nav.ru-nav').waitFor();
+  assert.equal(await lms.locator('.nav-sidebar').isVisible(), false);
   assert.equal(await lms.locator('.ru-c').count(), 2);
   assert.equal(await lms.$eval('[data-block-id="b1"]', (el) => getComputedStyle(el).borderTopLeftRadius), '16px');
 
