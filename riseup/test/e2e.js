@@ -20,11 +20,13 @@ const MOCK = (editable) => `<!doctype html><html><head><title>Fire Safety Basics
 <style>body{font-family:Lato,sans-serif;background:#f3f3f3;margin:0;padding:24px;color:#313537}
 .block-wrapper{background:#fff;margin:16px auto;max-width:760px;padding:30px 40px}
 .brand--background{background:#d84745;color:#fff}
-.blocks-button__button{display:inline-block;padding:10px 20px}</style></head>
+h2{font-family:Georgia,serif}
+.blocks-button__button{display:inline-block;padding:10px 20px;border-radius:4px}
+.block-wrapper.dark{background:#1f2430;color:#f0f0f0}</style></head>
 <body><div class="blocks-lesson">
 <section class="block-wrapper" data-block-id="b1"><h2>Fire safety at work</h2>
 <p ${editable ? 'contenteditable="true"' : ''} id="para">Fire safety matters. Report every fire safety issue to Acme facilities.</p></section>
-${markers.map((m, i) => `<section class="block-wrapper" data-block-id="m${i}"><p ${editable ? 'contenteditable="true"' : ''}>${m}</p></section>`).join('\n')}
+${markers.map((m, i) => `<section class="block-wrapper${i === 1 ? ' dark' : ''}" data-block-id="m${i}"><p ${editable ? 'contenteditable="true"' : ''}>${m}</p></section>`).join('\n')}
 <section class="block-wrapper" data-block-id="b2"><a class="blocks-button__button brand--background" href="#">Continue</a>
 <p><a href="#x">Read the policy</a></p></section>
 <section class="block-wrapper" data-block-id="b3"><p>More content below.</p></section>
@@ -172,6 +174,17 @@ ${markers.map((m, i) => `<section class="block-wrapper" data-block-id="m${i}"><p
   const accent = await preview.$eval('.ru-c', (el) => getComputedStyle(el).getPropertyValue('--ru-accent').trim());
   assert.equal(accent, '#d84745', 'blocks pick up the course theme colour');
   assert.ok(await preview.locator('[data-block-id].ru-anim-rise').count() >= 3, 'blocks animate on scroll');
+  // Blocks match the course: heading font, button shape, and dark block backgrounds.
+  const look = await preview.$eval('.ru-c-flipcards', (el) => ({
+    heading: getComputedStyle(el.querySelector('.ru-flip-front')).fontFamily,
+    body: getComputedStyle(el).fontFamily,
+    dark: el.classList.contains('ru-on-dark'),
+  }));
+  assert.match(look.heading, /Georgia/);
+  assert.match(look.body, /Lato/);
+  assert.equal(look.dark, false);
+  assert.equal(await preview.$eval('.ru-c-stats', (el) => el.classList.contains('ru-on-dark')), true, 'block on a dark background adapts');
+  assert.equal(await preview.$eval('.ru-c-stats .ru-stat-label', (el) => getComputedStyle(el).color), 'rgba(255, 255, 255, 0.75)');
   assert.equal(await preview.locator('#para span[data-riseup-rule]').count(), 1);
   await preview.waitForTimeout(1600);
   await shot(preview, '7-preview', { fullPage: true });

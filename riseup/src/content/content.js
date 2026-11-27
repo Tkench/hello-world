@@ -510,9 +510,12 @@
       h('div', { class: 'gallery' }, entries.filter(([, d]) => d.kind === 'template').map(tile)),
       h('p', { class: 'group-label' }, 'Interactive'),
       h('div', { class: 'gallery' }, entries.filter(([, d]) => d.kind === 'interactive').map(tile)),
-      h('div', { style: 'margin-top:14px' }, acc(T, 'look', 'Block colours', [
-        field('Accent colour', colorInput(theme.accent, (v) => { theme.accent = v; saveConfig(); })),
-        h('p', { class: 'empty' }, 'Leave on Default to match the course’s Rise theme colour.'),
+      h('div', { style: 'margin-top:14px' }, acc(T, 'look', 'Block look', [
+        h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: theme.matchCourse !== false, onchange: (e) => { theme.matchCourse = e.target.checked; saveConfig(); panel.render(); } }), 'Match the course\u2019s colour, fonts and buttons'),
+        h('p', { class: 'empty' }, theme.matchCourse !== false
+          ? 'Blocks take the Rise theme colour, heading and body fonts, text colour and button shape, and adapt to dark block backgrounds.'
+          : 'Blocks use the colour below and the page\u2019s default font.'),
+        field(theme.matchCourse !== false ? 'Override colour' : 'Accent colour', colorInput(theme.accent, (v) => { theme.accent = v; saveConfig(); })),
         field('Corner radius', numberInput(theme.radius, (v) => { theme.radius = v === null ? 12 : v; saveConfig(); }, { min: 0, max: 32 })),
       ])),
     ];
@@ -523,6 +526,13 @@
     const previewBox = h('div', { class: 'preview' + (comp.type === 'hotspots' ? ' pickable' : '') });
     const drawPreview = () => {
       const node = RU.renderComponent(document, comp, { courseKey: 'preview', static: true });
+      const theme = state.config.componentTheme;
+      if (node && theme.matchCourse !== false) {
+        // Preview with the course's fonts and colours, read from the lesson that's open.
+        const look = RU.detectCourseTheme(document, null);
+        delete look.dark; // the preview card is always light
+        RU.applyCourseTheme(node, look, { keepAccent: Boolean(theme.accent) });
+      }
       previewBox.replaceChildren(h('span', { class: 'preview-label' }, comp.type === 'hotspots' ? 'Preview · click the image to add a hotspot' : 'Preview'), node || '');
       if (comp.type === 'hotspots') {
         const stage = previewBox.querySelector('.ru-hs-stage');
@@ -836,7 +846,7 @@
     }
     panel.refreshPreviewCss = () => {
       const theme = Object.assign({}, state.config.componentTheme);
-      if (!theme.accent) theme.accent = courseAccent();
+      if (!theme.accent && theme.matchCourse !== false) theme.accent = courseAccent();
       previewStyle.textContent = RU.COMPONENT_CSS + '\n' + RU.themeCss(theme) +
         '\n' + state.config.textStyles.map(RU.textStyleCss).join('\n');
     };

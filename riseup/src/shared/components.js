@@ -535,6 +535,79 @@
     },
   };
 
+  // ------------------------------------------------------------------ course theme
+  function rgbToHex(c) {
+    const m = c && c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/);
+    if (!m || (m[4] !== undefined && Number(m[4]) < 0.5)) return '';
+    return '#' + [m[1], m[2], m[3]].map((v) => ('0' + Number(v).toString(16)).slice(-2)).join('');
+  }
+
+  function luminanceOf(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    const lin = (v) => { const x = v / 255; return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+    return 0.2126 * lin(n >> 16) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+  }
+
+  /**
+   * Read the look of the Rise course around `near` (the element a block code
+   * sits in): theme colour, heading and body fonts, text colour, button
+   * shape, and whether the block's background is dark. Anything that can't
+   * be read is left out, so the block falls back to its defaults.
+   */
+  function detectCourseTheme(doc, near) {
+    const win = doc.defaultView;
+    const cs = (el) => win.getComputedStyle(el);
+    const outside = (el) => !el.closest('.ru-c, riseup-panel, [data-riseup-ignore]');
+    const pick = (sel) => Array.from(doc.querySelectorAll(sel)).find((el) => outside(el) && el.offsetParent !== null) || null;
+    const t = {};
+
+    const brand = pick('.brand--background, [class*="brand--background"]');
+    if (brand) t.accent = rgbToHex(cs(brand).backgroundColor);
+    if (!t.accent) {
+      const branded = pick('.brand--color, [class*="brand--color"], .brand--link');
+      if (branded) t.accent = rgbToHex(cs(branded).color);
+    }
+
+    const heading = pick('.lesson-header__title, [data-block-id] h1, [data-block-id] h2, [data-block-id] h3, .block-wrapper h2, .block-wrapper h3, main h1, main h2');
+    if (heading) t.headingFont = cs(heading).fontFamily;
+
+    const textEl = near && near.nodeType === 1 ? near : pick('[data-block-id] p, .block-wrapper p, main p');
+    if (textEl) {
+      t.bodyFont = cs(textEl).fontFamily;
+      t.ink = rgbToHex(cs(textEl).color);
+      // The first solid background behind the block decides light or dark.
+      for (let e = textEl; e && e.nodeType === 1; e = e.parentElement) {
+        const bg = rgbToHex(cs(e).backgroundColor);
+        if (bg) { t.dark = luminanceOf(bg) < 0.2; break; }
+      }
+    }
+
+    const button = pick('.blocks-button__button, [data-block-id] a.brand--background, [data-block-id] button.brand--background');
+    if (button) {
+      const r = cs(button).borderTopLeftRadius;
+      if (r && r !== '0px') t.buttonRadius = r;
+      else if (r === '0px') t.buttonRadius = '0px';
+    }
+    return t;
+  }
+
+  /** Put a detected theme onto one rendered block. */
+  function applyCourseTheme(node, t, opts) {
+    if (!node || !t) return;
+    const o = opts || {};
+    const set = (k, v) => { if (v) node.style.setProperty(k, v); };
+    if (!o.keepAccent && t.accent) {
+      set('--ru-accent', t.accent);
+      set('--ru-accent-ink', inkFor(t.accent));
+      set('--ru-accent-ink-large', largeInkFor(t.accent));
+    }
+    set('--ru-heading-font', t.headingFont);
+    set('--ru-body-font', t.bodyFont);
+    set('--ru-btn-radius', t.buttonRadius);
+    if (t.dark) node.classList.add('ru-on-dark');
+    else set('--ru-ink', t.ink);
+  }
+
   // ------------------------------------------------------------------ render
   function renderComponent(doc, comp, ctx) {
     const type = comp && TYPES[comp.type];
@@ -575,18 +648,19 @@
   const ANIMATIONS = { none: 'None', fade: 'Fade in', rise: 'Rise up', zoom: 'Zoom in', slide: 'Slide in from the side' };
 
   const COMPONENT_CSS = `
-.ru-c { --ru-accent: #2f6fde; --ru-accent-ink: #fff; --ru-radius: 12px; --ru-ink: #1d2330; --ru-muted: #5b6475; --ru-line: #e3e6ec; --ru-soft: #f5f6f9;
-  color: var(--ru-ink); font: inherit; line-height: 1.5; margin: 8px 0; text-align: left; white-space: normal; }
+.ru-c { --ru-accent: #2f6fde; --ru-accent-ink: #fff; --ru-radius: 12px; --ru-ink: #1d2330; --ru-muted: #5b6475; --ru-line: #e3e6ec; --ru-soft: #f5f6f9; --ru-card: #ffffff; --ru-btn-radius: 999px;
+  color: var(--ru-ink); font: inherit; font-family: var(--ru-body-font, inherit); line-height: 1.5; margin: 8px 0; text-align: left; white-space: normal; }
 .ru-c *, .ru-c *::before, .ru-c *::after { box-sizing: border-box; }
 .ru-c [hidden] { display: none !important; }
 .ru-c img { max-width: 100%; display: block; }
 .ru-c h2, .ru-c h3, .ru-c h4, .ru-c p, .ru-c ol, .ru-c ul, .ru-c figure, .ru-c blockquote { margin: 0; padding: 0; }
 .ru-c p, .ru-c .ru-flip-text, .ru-c .ru-tl-text { white-space: pre-line; }
+.ru-c .ru-title, .ru-c .ru-hero-title, .ru-c .ru-s-title, .ru-c .ru-s-num, .ru-c .ru-tl-title, .ru-c .ru-stat-value, .ru-c .ru-q, .ru-c .ru-flip-front, .ru-c .ru-quote blockquote p, .ru-c .ru-hs-pop h4 { font-family: var(--ru-heading-font, inherit); }
 .ru-c .ru-title { font-size: 1.35em; font-weight: 700; margin-bottom: 16px; }
 .ru-c .ru-instr { color: var(--ru-muted); font-size: .92em; margin-bottom: 14px; }
 .ru-c .ru-q { display: block; font-weight: 700; font-size: 1.08em; margin-bottom: 10px; }
 .ru-c .ru-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.ru-c .ru-btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border: 2px solid var(--ru-accent); border-radius: 999px; background: var(--ru-accent); color: var(--ru-accent-ink); font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
+.ru-c .ru-btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border: 2px solid var(--ru-accent); border-radius: var(--ru-btn-radius); background: var(--ru-accent); color: var(--ru-accent-ink); font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
 .ru-c .ru-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,.15); }
 .ru-c .ru-btn-ghost { background: transparent; color: var(--ru-accent); }
 .ru-c .ru-btn-light { background: #fff; border-color: #fff; color: #14161c; }
@@ -596,6 +670,12 @@
 .ru-c .ru-feedback.is-right { color: #1d7a46; }
 .ru-c .ru-feedback.is-wrong { color: #b3261e; }
 .ru-c .ru-hs-placeholder { display: grid; place-items: center; min-height: 220px; background: repeating-linear-gradient(45deg, var(--ru-soft), var(--ru-soft) 12px, #eceef3 12px, #eceef3 24px); color: var(--ru-muted); border-radius: var(--ru-radius); }
+
+/* On a dark Rise block: light text, translucent cards */
+.ru-c.ru-on-dark { --ru-ink: #ffffff; --ru-muted: rgba(255,255,255,.75); --ru-line: rgba(255,255,255,.22); --ru-soft: rgba(255,255,255,.08); --ru-card: rgba(255,255,255,.1); }
+.ru-c.ru-on-dark .ru-feedback.is-right { color: #5fd08f; }
+.ru-c.ru-on-dark .ru-feedback.is-wrong { color: #ff8a88; }
+.ru-c.ru-on-dark .ru-rf-input { background: rgba(0,0,0,.25); }
 
 /* Hero */
 .ru-c .ru-hero { position: relative; display: flex; align-items: center; color: #fff; background-size: cover; background-position: center; border-radius: var(--ru-radius); overflow: hidden; }
@@ -620,7 +700,7 @@
 .ru-c .ru-timeline::before { content: ""; position: absolute; left: 9px; top: 6px; bottom: 6px; width: 3px; border-radius: 3px; background: linear-gradient(var(--ru-accent), var(--ru-line)); }
 .ru-c .ru-tl-item { position: relative; padding-bottom: 26px; }
 .ru-c .ru-tl-item:last-child { padding-bottom: 0; }
-.ru-c .ru-tl-dot { position: absolute; left: -34px; top: 3px; width: 21px; height: 21px; border-radius: 50%; background: #fff; border: 4px solid var(--ru-accent); }
+.ru-c .ru-tl-dot { position: absolute; left: -34px; top: 3px; width: 21px; height: 21px; border-radius: 50%; background: var(--ru-card); border: 4px solid var(--ru-accent); }
 .ru-c .ru-tl-date { font-size: .8em; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--ru-accent); }
 .ru-c .ru-tl-title { font-size: 1.15em; font-weight: 700; margin: 2px 0 4px; }
 .ru-c .ru-tl-text { color: var(--ru-muted); }
@@ -660,7 +740,7 @@
 .ru-c .ru-flip-front { background: var(--ru-accent); color: var(--ru-accent-ink-large, var(--ru-accent-ink)); font-weight: 800; font-size: 1.2em; box-shadow: 0 6px 18px rgba(0,0,0,.12); }
 .ru-c .ru-flip-front img { max-height: 90px; border-radius: 8px; }
 .ru-c .ru-flip-hint { position: absolute; bottom: 10px; right: 14px; font-size: .6em; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; opacity: .75; }
-.ru-c .ru-flip-back { background: #fff; color: var(--ru-ink); border: 2px solid var(--ru-accent); transform: rotateY(180deg); font-size: .98em; }
+.ru-c .ru-flip-back { background: var(--ru-card); color: var(--ru-ink); border: 2px solid var(--ru-accent); transform: rotateY(180deg); font-size: .98em; }
 .ru-c .ru-flip:hover .ru-flip-front { filter: brightness(1.06); }
 
 /* Hotspots */
@@ -671,19 +751,19 @@
 .ru-c .ru-hs-pin.is-open { background: #fff; color: #14161c; }
 .ru-c .ru-hs-pin.is-open::after { animation: none; }
 @keyframes ru-pulse { 0% { transform: scale(.6); opacity: .8; } 100% { transform: scale(1.4); opacity: 0; } }
-.ru-c .ru-hs-pop { position: absolute; z-index: 3; width: min(300px, 80%); padding: 16px 18px; border-radius: var(--ru-radius); background: #fff; color: var(--ru-ink); box-shadow: 0 14px 40px rgba(0,0,0,.28); }
+.ru-c .ru-hs-pop { position: absolute; z-index: 3; width: min(300px, 80%); padding: 16px 18px; border-radius: var(--ru-radius); background: #fff; color: #1d2330; box-shadow: 0 14px 40px rgba(0,0,0,.28); }
 .ru-c .ru-hs-pop h4 { font-size: 1.05em; font-weight: 800; margin: 0 22px 6px 0; }
 .ru-c .ru-hs-close { position: absolute; top: 8px; right: 10px; border: 0; background: none; font-size: 22px; line-height: 1; cursor: pointer; color: var(--ru-muted); }
 
 /* Put in order */
 .ru-c .ru-sort { list-style: none; display: flex; flex-direction: column; gap: 8px; counter-reset: ru; }
-.ru-c .ru-sort-item { counter-increment: ru; display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 14px; border-radius: var(--ru-radius); background: #fff; border: 2px solid var(--ru-line); box-shadow: 0 2px 6px rgba(0,0,0,.05); cursor: grab; transition: border-color .15s, transform .15s; }
+.ru-c .ru-sort-item { counter-increment: ru; display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 14px; border-radius: var(--ru-radius); background: var(--ru-card); border: 2px solid var(--ru-line); box-shadow: 0 2px 6px rgba(0,0,0,.05); cursor: grab; transition: border-color .15s, transform .15s; }
 .ru-c .ru-sort-item::before { content: counter(ru); font-weight: 800; color: var(--ru-accent); min-width: 1.2em; }
 .ru-c .ru-sort-item.is-drag { opacity: .5; }
 .ru-c .ru-sort-item.is-over { border-color: var(--ru-accent); transform: scale(1.01); }
-.ru-c .ru-sort-item.is-right { border-color: #1d7a46; background: #eef8f2; cursor: default; }
+.ru-c .ru-sort-item.is-right { border-color: #1d7a46; background: color-mix(in srgb, #1d7a46 12%, var(--ru-card)); cursor: default; }
 .ru-c .ru-sort-item.is-right::after { content: "\\2713"; color: #1d7a46; font-weight: 800; }
-.ru-c .ru-sort-item.is-wrong { border-color: #b3261e; background: #fdf0ef; cursor: default; }
+.ru-c .ru-sort-item.is-wrong { border-color: #b3261e; background: color-mix(in srgb, #b3261e 10%, var(--ru-card)); cursor: default; }
 .ru-c .ru-sort-item.is-wrong::after { content: "\\2717"; color: #b3261e; font-weight: 800; }
 .ru-c .ru-sort-grip { color: var(--ru-muted); }
 .ru-c .ru-sort-text { flex: 1; font-weight: 600; }
@@ -694,7 +774,7 @@
 /* Reveal */
 .ru-c .ru-rv { padding: 20px 22px; border-radius: var(--ru-radius); background: var(--ru-soft); border-left: 5px solid var(--ru-accent); }
 .ru-c .ru-rv + .ru-rv { margin-top: 12px; }
-.ru-c .ru-rv-answer { margin-top: 14px; padding: 14px 16px; border-radius: calc(var(--ru-radius) - 4px); background: #fff; animation: ru-in .35s ease; }
+.ru-c .ru-rv-answer { margin-top: 14px; padding: 14px 16px; border-radius: calc(var(--ru-radius) - 4px); background: var(--ru-card); animation: ru-in .35s ease; }
 @keyframes ru-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 
 /* Before / after */
@@ -712,7 +792,7 @@
 
 /* Reflection */
 .ru-c .ru-rf { padding: 22px; border-radius: var(--ru-radius); background: var(--ru-soft); }
-.ru-c .ru-rf-input { width: 100%; padding: 12px 14px; border-radius: calc(var(--ru-radius) - 4px); border: 2px solid var(--ru-line); background: #fff; color: var(--ru-ink); font: inherit; resize: vertical; }
+.ru-c .ru-rf-input { width: 100%; padding: 12px 14px; border-radius: calc(var(--ru-radius) - 4px); border: 2px solid var(--ru-line); background: var(--ru-card); color: var(--ru-ink); font: inherit; resize: vertical; }
 
 /* Scroll animations */
 .ru-anim { transition: opacity var(--ru-dur, .7s) ease, transform var(--ru-dur, .7s) cubic-bezier(.2,.7,.2,1); }
@@ -734,5 +814,6 @@
   return {
     TYPES, MARKER_RE, COMPONENT_CSS, ANIMATIONS,
     markerFor, newComponentId, renderComponent, themeCss, inkFor, safeUrl,
+    detectCourseTheme, applyCourseTheme,
   };
 });

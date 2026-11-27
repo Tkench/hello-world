@@ -60,7 +60,8 @@
       (doc.head || doc.documentElement).appendChild(style);
     }
     var theme = Object.assign({}, cfg.componentTheme || {});
-    if (!theme.accent) theme.accent = detectAccent(doc);
+    var matchCourse = theme.matchCourse !== false;
+    if (!theme.accent && matchCourse) theme.accent = detectAccent(doc);
     style.textContent = RU.COMPONENT_CSS + '\n' + RU.themeCss(theme) + '\n:root { --ru-dur: ' + duration + 'ms; }';
 
     if (animation !== 'none' && win.IntersectionObserver && !(win.matchMedia && win.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
@@ -84,10 +85,13 @@
       hits.forEach(function (h) {
         var host = hostOf(h.node);
         if (!host || host.hasAttribute(HOST_ATTR)) return;
+        // Read the course's look around this spot before the code is hidden.
+        var look = matchCourse ? RU.detectCourseTheme(doc, host) : null;
         host.setAttribute(HOST_ATTR, h.id);
         host.style.display = 'none';
         var comp = components[h.id];
         var node = comp ? RU.renderComponent(doc, comp, { courseKey: courseKey() }) : null;
+        if (node && look) RU.applyCourseTheme(node, look, { keepAccent: Boolean(cfg.componentTheme && cfg.componentTheme.accent) });
         if (node) {
           if (io && comp.type !== 'hero') { node.classList.add('ru-staged'); }
           host.parentNode.insertBefore(node, host.nextSibling);

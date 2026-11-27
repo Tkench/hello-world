@@ -306,3 +306,24 @@ test('large text on mid-tone accents stays white', () => {
   assert.match(comps.themeCss({ accent: '#2b94e5' }), /--ru-accent-ink-large: #ffffff/);
   assert.match(comps.themeCss({ accent: '#ffa34a' }), /--ru-accent-ink-large: #14161c/);
 });
+
+test('blocks read the course look around them', () => {
+  const dom = new JSDOM(`<!doctype html><body>
+    <style>h2{font-family:Georgia} p{font-family:Lato;color:rgb(10,20,30)} .dark{background:rgb(20,20,20)} .brand--background{background:rgb(216,71,69)} .blocks-button__button{border-top-left-radius:4px}</style>
+    <section data-block-id="a"><h2>Title</h2><p id="light">x</p><a class="blocks-button__button brand--background">Go</a></section>
+    <section data-block-id="b" class="dark"><p id="dark">y</p></section></body>`, { pretendToBeVisual: true });
+  const doc = dom.window.document;
+  // jsdom has no layout, so treat every element as visible.
+  Object.defineProperty(dom.window.HTMLElement.prototype, 'offsetParent', { get() { return this.parentNode; } });
+  const light = comps.detectCourseTheme(doc, doc.getElementById('light'));
+  assert.equal(light.accent, '#d84745');
+  assert.match(light.headingFont, /Georgia/);
+  assert.match(light.bodyFont, /Lato/);
+  assert.equal(light.ink, '#0a141e');
+  assert.equal(light.buttonRadius, '4px');
+  assert.equal(comps.detectCourseTheme(doc, doc.getElementById('dark')).dark, true);
+  const node = comps.renderComponent(doc, { id: 'z', type: 'stats', data: comps.TYPES.stats.defaults() }, { static: true });
+  comps.applyCourseTheme(node, light, { keepAccent: true });
+  assert.equal(node.style.getPropertyValue('--ru-accent'), '', 'an explicit accent wins');
+  assert.match(node.style.getPropertyValue('--ru-heading-font'), /Georgia/);
+});

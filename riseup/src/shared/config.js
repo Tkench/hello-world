@@ -39,7 +39,7 @@
       textStyles: [], // see textRules.js for the shape
       textRules: [], // [{ id, text, styleId, matchCase, wholeWord }]
       components: [], // RiseUp blocks: [{ id, type, name, data }] (see components.js)
-      componentTheme: { accent: '', radius: 12 }, // accent '' = use the course's Rise theme colour
+      componentTheme: { accent: '', radius: 12, matchCourse: true }, // matchCourse: take colour, fonts and button shape from the Rise course
       animation: { type: 'none', duration: 700 }, // scroll animation for blocks
     };
   }
