@@ -1,0 +1,19 @@
+{
+  "name": "riseup",
+  "version": "0.1.0",
+  "description": "RiseUp: a Chrome extension that adds styling, per-phrase fonts, find and replace, and colour tools to Articulate Rise 360.",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "node --test test/unit.test.js",
+    "test:e2e": "node test/e2e.js",
+    "package": "rm -f riseup.zip && zip -r riseup.zip manifest.json icons src vendor -x \"*.DS_Store\""
+  },
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "jsdom": "^24.1.3",
+    "jszip": "^3.10.1"
+  },
+  "private": true
+}

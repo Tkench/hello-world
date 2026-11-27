@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RiseUp</title>
+<link rel="stylesheet" href="../tools/ui.css">
+<style>
+  body { width: 280px; padding: 14px; margin: 0; }
+  h1 { font-size: 16px; margin: 0 0 10px; }
+  .stack { display: flex; flex-direction: column; gap: 8px; }
+  p { margin: 0; }
+</style>
+</head>
+<body>
+  <h1>RiseUp</h1>
+  <div class="stack">
+    <label class="check"><input type="checkbox" id="enabled"> Apply RiseUp in Rise</label>
+    <label class="check"><input type="checkbox" id="launcher"> Show the RiseUp button in Rise</label>
+    <p class="hint" id="where"></p>
+    <button class="btn primary" id="tools" type="button">Publish &amp; tools</button>
+  </div>
+<script src="popup.js"></script>
+</body>
+</html>

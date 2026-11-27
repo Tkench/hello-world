@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RiseUp tools</title>
+<link rel="stylesheet" href="ui.css">
+<link rel="stylesheet" href="tools.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>RiseUp tools</h1>
+    <p class="hint">Publish your RiseUp styling with a course, change text across a whole course, and back up your settings.</p>
+  </header>
+
+  <section class="card">
+    <h2>Course</h2>
+    <div class="row">
+      <select id="course" aria-label="Course"></select>
+    </div>
+    <p class="hint" id="course-summary"></p>
+  </section>
+
+  <section class="card">
+    <h2>1. Publish with RiseUp styling</h2>
+    <p class="hint">In Rise, publish the course as usual (SCORM, xAPI, cmi5, AICC or Web) and download the zip. Drop it here. RiseUp adds its styling and gives you a new zip to upload to your LMS. Learners don't need RiseUp.</p>
+    <label class="check"><input type="checkbox" id="embed-fonts" checked> Include fonts in the package (works without internet access to Google Fonts)</label>
+    <div class="drop" id="zip-drop" tabindex="0" role="button" aria-label="Choose a published course zip">
+      <strong>Drop a published course .zip</strong> or click to choose
+      <input type="file" id="zip-input" accept=".zip,application/zip" hidden>
+    </div>
+    <p class="status" id="zip-status" role="status"></p>
+  </section>
+
+  <section class="card">
+    <h2>2. Course-wide find and replace</h2>
+    <p class="hint">Rise has no course-wide find and replace, so this uses Rise's translation files. In Rise: <em>Settings → Translations → Export</em> to download an XLIFF file. Change text here, then <em>Translations → Import</em> the new file. Duplicate the course first if you want a backup.</p>
+    <div class="drop" id="xlf-drop" tabindex="0" role="button" aria-label="Choose an XLIFF file">
+      <strong>Drop an exported .xlf / .xliff file</strong> or click to choose
+      <input type="file" id="xlf-input" accept=".xlf,.xliff,.xml" hidden>
+    </div>
+    <div class="grid">
+      <label>Find <input type="text" id="xlf-find"></label>
+      <label>Replace with <input type="text" id="xlf-replace"></label>
+    </div>
+    <div class="row">
+      <label class="check"><input type="checkbox" id="xlf-case"> Match case</label>
+      <label class="check"><input type="checkbox" id="xlf-word"> Whole words</label>
+    </div>
+    <div class="row">
+      <button class="btn" id="xlf-preview" type="button" disabled>Preview matches</button>
+      <button class="btn primary" id="xlf-run" type="button" disabled>Replace and download</button>
+    </div>
+    <p class="status" id="xlf-status" role="status"></p>
+    <ol class="matches" id="xlf-matches"></ol>
+  </section>
+
+  <section class="card">
+    <h2>3. Back up and share settings</h2>
+    <p class="hint">Export this course's RiseUp settings to share with your team or reuse in another course.</p>
+    <div class="row">
+      <button class="btn" id="export" type="button">Export settings</button>
+      <button class="btn" id="import" type="button">Import into this course</button>
+      <input type="file" id="import-input" accept=".json,application/json" hidden>
+      <button class="btn danger" id="delete" type="button">Delete this course's settings</button>
+    </div>
+    <p class="status" id="backup-status" role="status"></p>
+  </section>
+</main>
+<script src="../../vendor/jszip.min.js"></script>
+<script src="../shared/config.js"></script>
+<script src="../shared/css.js"></script>
+<script src="../shared/textRules.js"></script>
+<script src="../shared/fontLoader.js"></script>
+<script src="../shared/xliff.js"></script>
+<script src="../shared/package.js"></script>
+<script src="tools.js"></script>
+</body>
+</html>
