@@ -288,6 +288,152 @@
     },
   };
 
+  TYPES.flipcarousel = {
+    label: 'Flip card carousel', kind: 'interactive',
+    description: 'Flip cards in a moving 3D carousel. Learners go forwards and backwards and flip the card at the front.',
+    fields: [
+      { key: 'title', label: 'Instructions', type: 'text' },
+      { key: 'layout', label: 'Layout', type: 'select', options: [['carousel', '3D carousel'], ['deck', 'Stacked deck']] },
+      { key: 'loop', label: 'Loop back to the first card at the end', type: 'checkbox' },
+      { key: 'progress', label: 'Show how many cards have been flipped', type: 'checkbox' },
+      { key: 'cards', label: 'Cards', type: 'list', itemLabel: 'Card', min: 2, max: 16, fields: [
+        { key: 'front', label: 'Front', type: 'textarea' },
+        { key: 'back', label: 'Back', type: 'textarea' },
+        { key: 'image', label: 'Front image (optional)', type: 'image' },
+      ] },
+    ],
+    defaults: () => ({ title: 'Use the arrows to move through the cards. Select the front card to flip it.', layout: 'carousel', loop: true, progress: true, cards: [
+      { front: 'Hazard', back: 'Anything with the potential to cause harm.', image: '' },
+      { front: 'Risk', back: 'How likely it is that a hazard causes harm, and how badly.', image: '' },
+      { front: 'Near miss', back: 'An event that could have caused harm but didn’t. Report it anyway.', image: '' },
+      { front: 'Control measure', back: 'Something put in place to reduce a risk, such as a guard or training.', image: '' },
+      { front: 'PPE', back: 'Personal protective equipment: the last line of defence, not the first.', image: '' },
+    ] }),
+    render(doc, d, ctx) {
+      const win = doc.defaultView;
+      const cards = (d.cards || []).filter((c) => c && (c.front || c.back || c.image));
+      const n = cards.length;
+      const loop = d.loop !== false && n > 2;
+      const deck = d.layout === 'deck';
+      let current = 0;
+      const flipped = new Set();
+      const uid = 'ru-fcc-' + ((ctx && ctx.id) || 'x');
+
+      const live = el(doc, 'p', { class: 'ru-sr', 'aria-live': 'polite' });
+      const stage = el(doc, 'div', { class: 'ru-fcc-stage' + (deck ? ' ru-fcc-deck' : ''), tabindex: '0', 'aria-label': 'Cards. Use the left and right arrow keys to move.' });
+      const slides = cards.map((c, i) => {
+        const img = safeUrl(c.image, 'image');
+        const front = el(doc, 'span', { class: 'ru-flip-face ru-flip-front' }, [img ? el(doc, 'img', { src: img, alt: '' }) : null, el(doc, 'span', { class: 'ru-flip-text', text: c.front || '' }), el(doc, 'span', { class: 'ru-flip-hint', text: 'Flip' })]);
+        const back = el(doc, 'span', { class: 'ru-flip-face ru-flip-back', 'aria-hidden': 'true' }, [el(doc, 'span', { class: 'ru-flip-text', text: c.back || '' })]);
+        const btn = el(doc, 'button', { type: 'button', class: 'ru-flip', 'aria-pressed': 'false', 'aria-label': (c.front || 'Card ' + (i + 1)) + ': flip card' }, [el(doc, 'span', { class: 'ru-flip-inner' }, [front, back])]);
+        const slide = el(doc, 'div', { class: 'ru-fcc-card', role: 'group', 'aria-roledescription': 'card', 'aria-label': (i + 1) + ' of ' + n }, [btn]);
+        btn.addEventListener('click', () => {
+          if (i !== current) { go(i); return; } // a side card brings itself to the front
+          const on = btn.getAttribute('aria-pressed') !== 'true';
+          btn.setAttribute('aria-pressed', String(on));
+          back.setAttribute('aria-hidden', String(!on));
+          front.setAttribute('aria-hidden', String(on));
+          if (on) flipped.add(i);
+          live.textContent = on ? (c.back || '') : (c.front || '');
+          update();
+        });
+        return { slide, btn };
+      });
+      slides.forEach((s) => stage.appendChild(s.slide));
+
+      const prev = el(doc, 'button', { type: 'button', class: 'ru-fcc-nav ru-fcc-prev', 'aria-label': 'Previous card', 'aria-controls': uid, text: '‹' });
+      const next = el(doc, 'button', { type: 'button', class: 'ru-fcc-nav ru-fcc-next', 'aria-label': 'Next card', 'aria-controls': uid, text: '›' });
+      const dots = el(doc, 'div', { class: 'ru-fcc-dots' });
+      const dotBtns = cards.map((c, i) => {
+        const b = el(doc, 'button', { type: 'button', class: 'ru-fcc-dot', 'aria-label': 'Go to card ' + (i + 1) + (c.front ? ': ' + c.front : '') });
+        b.addEventListener('click', () => go(i));
+        dots.appendChild(b);
+        return b;
+      });
+      const count = el(doc, 'p', { class: 'ru-fcc-count' });
+
+      /** Signed distance from the front card, the short way round when looping. */
+      function offset(i) {
+        let o = i - current;
+        if (loop) {
+          if (o > n / 2) o -= n;
+          if (o < -n / 2) o += n;
+        }
+        return o;
+      }
+
+      function update() {
+        slides.forEach(({ slide, btn }, i) => {
+          const o = offset(i);
+          const a = Math.abs(o);
+          const visible = a <= (deck ? 3 : 2);
+          let t;
+          if (deck) {
+            t = o < 0
+              ? 'translateX(' + (-110 - (a - 1) * 8) + '%) rotate(' + (-8 - a * 2) + 'deg) scale(.92)'
+              : 'translateY(' + (a * 14) + 'px) scale(' + (1 - a * 0.05) + ')';
+          } else {
+            const x = a === 0 ? 0 : (a === 1 ? 78 : 128);
+            t = 'translateX(' + (Math.sign(o) * x) + '%) translateZ(' + (-a * 160) + 'px) rotateY(' + (-Math.sign(o) * (a ? 38 : 0)) + 'deg)';
+          }
+          slide.style.transform = t;
+          slide.style.zIndex = String(100 - a * 2 - (deck && o < 0 ? 50 : 0));
+          slide.style.opacity = visible ? (deck ? (o < 0 ? (a === 1 ? '1' : '0') : String(1 - a * 0.15)) : (a <= 1 ? '1' : '0.55')) : '0';
+          slide.classList.toggle('is-far', a >= 2);
+          slide.style.pointerEvents = visible && !(deck && o < -1) ? 'auto' : 'none';
+          slide.classList.toggle('is-current', o === 0);
+          // Only the front card is reachable by keyboard and screen readers.
+          if (o === 0) { slide.removeAttribute('aria-hidden'); btn.removeAttribute('tabindex'); }
+          else { slide.setAttribute('aria-hidden', 'true'); btn.setAttribute('tabindex', '-1'); }
+          slide.classList.toggle('is-flipped-done', flipped.has(i));
+        });
+        dotBtns.forEach((b, i) => {
+          b.classList.toggle('is-active', i === current);
+          b.classList.toggle('is-seen', flipped.has(i));
+          if (i === current) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
+        });
+        prev.disabled = !loop && current === 0;
+        next.disabled = !loop && current === n - 1;
+        count.textContent = 'Card ' + (current + 1) + ' of ' + n + (d.progress !== false ? ' · ' + flipped.size + ' flipped' : '');
+      }
+
+      function go(i, announce) {
+        if (!n) return;
+        const target = loop ? (i + n) % n : Math.max(0, Math.min(n - 1, i));
+        if (target === current) return;
+        current = target;
+        update();
+        if (announce !== false) live.textContent = 'Card ' + (current + 1) + ' of ' + n + ': ' + (cards[current].front || '');
+      }
+
+      prev.addEventListener('click', () => go(current - 1));
+      next.addEventListener('click', () => go(current + 1));
+      stage.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight') { e.preventDefault(); go(current + 1); }
+        else if (e.key === 'ArrowLeft') { e.preventDefault(); go(current - 1); }
+        else if (e.key === 'Home') { e.preventDefault(); go(0); }
+        else if (e.key === 'End') { e.preventDefault(); go(n - 1); }
+      });
+      // Swipe on touch screens.
+      let sx = null;
+      stage.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') sx = e.clientX; });
+      stage.addEventListener('pointerup', (e) => {
+        if (sx === null) return;
+        const dx = e.clientX - sx;
+        sx = null;
+        if (Math.abs(dx) > 40) go(current + (dx < 0 ? 1 : -1));
+      });
+      update();
+
+      return el(doc, 'section', { class: 'ru-fcc', role: 'region', 'aria-roledescription': 'carousel', 'aria-label': d.title || 'Flip card carousel' }, [
+        d.title ? el(doc, 'p', { class: 'ru-instr', text: d.title }) : null,
+        el(doc, 'div', { class: 'ru-fcc-frame', id: uid }, [prev, stage, next]),
+        el(doc, 'div', { class: 'ru-fcc-foot' }, [dots, count]),
+        live,
+      ]);
+    },
+  };
+
   TYPES.hotspots = {
     label: 'Image hotspots', kind: 'interactive',
     description: 'Numbered markers on an image that open a short explanation.',
@@ -743,6 +889,29 @@
 .ru-c .ru-flip-back { background: var(--ru-card); color: var(--ru-ink); border: 2px solid var(--ru-accent); transform: rotateY(180deg); font-size: .98em; }
 .ru-c .ru-flip:hover .ru-flip-front { filter: brightness(1.06); }
 
+/* Flip card carousel */
+.ru-c .ru-fcc-frame { position: relative; display: flex; align-items: center; gap: 8px; }
+.ru-c .ru-fcc-stage { position: relative; flex: 1; height: 330px; perspective: 1200px; transform-style: preserve-3d; overflow: hidden; outline: none; touch-action: pan-y; border-radius: var(--ru-radius); }
+.ru-c .ru-fcc-stage:focus-visible { outline: 3px solid var(--ru-accent); outline-offset: 2px; }
+.ru-c .ru-fcc-card { position: absolute; top: 18px; left: 50%; width: min(220px, 46%); margin-left: calc(min(220px, 46%) / -2); height: 280px; transition: transform .6s cubic-bezier(.2,.75,.2,1), opacity .45s ease; transform-style: preserve-3d; will-change: transform; }
+.ru-c .ru-fcc-card .ru-flip, .ru-c .ru-fcc-card .ru-flip-inner { height: 100%; min-height: 0; }
+.ru-c .ru-fcc-card:not(.is-current) .ru-flip-front { filter: brightness(.82) saturate(.9); box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+.ru-c .ru-fcc-card:not(.is-current) .ru-flip-hint, .ru-c .ru-fcc-card.is-far .ru-flip-text, .ru-c .ru-fcc-card.is-far img { visibility: hidden; }
+.ru-c .ru-fcc-card.is-current .ru-flip-front { box-shadow: 0 16px 34px rgba(0,0,0,.22); }
+.ru-c .ru-fcc-card.is-flipped-done .ru-flip-hint::before { content: "\\2713  "; }
+.ru-c .ru-fcc-deck .ru-fcc-card { top: 14px; }
+.ru-c .ru-fcc-nav { flex: none; width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--ru-accent); background: var(--ru-card); color: var(--ru-accent); font: 700 26px/1 system-ui, sans-serif; cursor: pointer; display: grid; place-items: center; padding-bottom: 3px; transition: background .15s, color .15s, transform .15s; }
+.ru-c .ru-fcc-nav:hover:not(:disabled) { background: var(--ru-accent); color: var(--ru-accent-ink); transform: scale(1.06); }
+.ru-c .ru-fcc-nav:disabled { opacity: .3; cursor: default; }
+.ru-c .ru-fcc-foot { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 10px; }
+.ru-c .ru-fcc-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+.ru-c .ru-fcc-dot { width: 24px; height: 24px; padding: 0; border: 0; background: none; cursor: pointer; display: grid; place-items: center; }
+.ru-c .ru-fcc-dot::before { content: ""; width: 9px; height: 9px; border-radius: 999px; background: var(--ru-line); transition: width .25s, background .25s; }
+.ru-c .ru-fcc-dot.is-seen::before { background: color-mix(in srgb, var(--ru-accent) 45%, var(--ru-line)); }
+.ru-c .ru-fcc-dot.is-active::before { width: 22px; background: var(--ru-accent); }
+.ru-c .ru-fcc-count { color: var(--ru-muted); font-size: .85em; font-weight: 600; }
+@media (max-width: 520px) { .ru-c .ru-fcc-nav { position: absolute; z-index: 120; bottom: -54px; } .ru-c .ru-fcc-prev { left: 0; } .ru-c .ru-fcc-next { right: 0; } .ru-c .ru-fcc-card { width: 62%; margin-left: -31%; } }
+
 /* Hotspots */
 .ru-c .ru-hs-stage { position: relative; border-radius: var(--ru-radius); }
 .ru-c .ru-hs-img { width: 100%; border-radius: var(--ru-radius); }
@@ -805,7 +974,7 @@
 .ru-c.ru-staged .ru-reveal { opacity: 0; transform: translateY(16px); }
 .ru-c.ru-staged .ru-reveal.ru-in { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) {
-  .ru-anim, .ru-c .ru-reveal, .ru-c .ru-flip-inner { transition: none !important; }
+  .ru-anim, .ru-c .ru-reveal, .ru-c .ru-flip-inner, .ru-c .ru-fcc-card { transition: none !important; }
   .ru-anim, .ru-c.ru-staged .ru-reveal { opacity: 1 !important; transform: none !important; }
   .ru-c .ru-hs-pin::after { animation: none; }
 }

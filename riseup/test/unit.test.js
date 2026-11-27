@@ -327,3 +327,45 @@ test('blocks read the course look around them', () => {
   assert.equal(node.style.getPropertyValue('--ru-accent'), '', 'an explicit accent wins');
   assert.match(node.style.getPropertyValue('--ru-heading-font'), /Georgia/);
 });
+
+test('flip card carousel moves forwards and backwards, loops, and flips the front card', () => {
+  const dom = new JSDOM('<!doctype html><body></body>', { pretendToBeVisual: true });
+  const doc = dom.window.document;
+  const data = { title: 'T', layout: 'carousel', loop: true, progress: true, cards: [
+    { front: 'A', back: 'a' }, { front: 'B', back: 'b' }, { front: 'C', back: 'c' }, { front: 'D', back: 'd' },
+  ] };
+  const node = comps.renderComponent(doc, { id: 'c1', type: 'flipcarousel', data });
+  doc.body.appendChild(node);
+  const front = () => node.querySelector('.ru-fcc-card.is-current .ru-flip-front .ru-flip-text').textContent;
+  const count = () => node.querySelector('.ru-fcc-count').textContent;
+  assert.equal(front(), 'A');
+  node.querySelector('.ru-fcc-next').click();
+  assert.equal(front(), 'B');
+  node.querySelector('.ru-fcc-prev').click();
+  node.querySelector('.ru-fcc-prev').click();
+  assert.equal(front(), 'D', 'loops backwards from the first card');
+  node.querySelector('.ru-fcc-stage').dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+  assert.equal(front(), 'A', 'arrow keys move');
+  // Only the front card is reachable.
+  assert.equal(node.querySelectorAll('.ru-fcc-card:not([aria-hidden])').length, 1);
+  node.querySelector('.ru-fcc-card.is-current .ru-flip').click();
+  assert.equal(node.querySelector('.ru-fcc-card.is-current .ru-flip').getAttribute('aria-pressed'), 'true');
+  assert.equal(count(), 'Card 1 of 4 · 1 flipped');
+  // Clicking a side card brings it to the front instead of flipping it.
+  const side = Array.from(node.querySelectorAll('.ru-fcc-card .ru-flip')).find((b) => b.getAttribute('aria-label').startsWith('B'));
+  side.click();
+  assert.equal(front(), 'B');
+  assert.equal(side.getAttribute('aria-pressed'), 'false');
+  node.querySelectorAll('.ru-fcc-dot')[3].click();
+  assert.equal(front(), 'D');
+});
+
+test('flip card carousel without looping stops at the ends', () => {
+  const dom = new JSDOM('<!doctype html><body></body>', { pretendToBeVisual: true });
+  const doc = dom.window.document;
+  const node = comps.renderComponent(doc, { id: 'c2', type: 'flipcarousel', data: { loop: false, layout: 'deck', cards: [{ front: 'A' }, { front: 'B' }, { front: 'C' }] } });
+  assert.equal(node.querySelector('.ru-fcc-prev').disabled, true);
+  node.querySelector('.ru-fcc-next').click();
+  node.querySelector('.ru-fcc-next').click();
+  assert.equal(node.querySelector('.ru-fcc-next').disabled, true);
+});

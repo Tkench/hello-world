@@ -256,6 +256,7 @@
     quote: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 9.5C3 6.5 4.6 4.6 7 4v1.6C5.8 6.1 5.2 7 5.1 8H7v4H3zM9 9.5C9 6.5 10.6 4.6 13 4v1.6c-1.2.5-1.8 1.4-1.9 2.4H13v4H9z"/></svg>',
     section: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 5h12M2 8h8M2 11h12"/></svg>',
     flipcards: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="3" width="7" height="10" rx="1.5"/><path d="M11.5 5.5c1.2.6 2 1.6 2 2.5s-.8 1.9-2 2.5" stroke-linecap="round"/></svg>',
+    flipcarousel: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="5" y="3" width="6" height="10" rx="1.4"/><path d="M3 5v6M13 5v6" stroke-linecap="round"/></svg>',
     hotspots: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2.5" width="12" height="11" rx="2"/><circle cx="6" cy="7" r="1.5" fill="currentColor"/><circle cx="10.5" cy="9.5" r="1.5" fill="currentColor"/></svg>',
     sort: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 4h7M6 8h7M6 12h7M3 3.5v9M2 11l1 1.5L4 11"/></svg>',
     reveal: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/></svg>',

@@ -13,7 +13,7 @@ Before building, Rise's current features were checked (November 2026) so RiseUp 
 | Find and replace | Nothing built in (a beta has been mentioned in the community) | Find and replace in the open lesson, and **course-wide** find and replace through Rise's XLIFF translation export/import |
 | Colour | Colour fields with hex input; brand colours with Brands (beta) | Eyedropper that picks from anywhere on screen, saved palettes, recent colours, WCAG contrast checker |
 | Design templates | Fixed block types and layouts | Hero banner, stat row with counting numbers, timeline, quote card, section header |
-| Interactive blocks | Accordion, tabs, flashcards, labelled graphic, sorting, knowledge checks | Flip cards, image hotspots, put-in-order (drag or arrow buttons), think-then-reveal, before/after image slider, reflection with saved and downloadable answers |
+| Interactive blocks | Accordion, tabs, flashcards, labelled graphic, sorting, knowledge checks | Flip card carousel (3D carousel or stacked deck, with arrows, dots, swipe and keyboard), flip cards, image hotspots, put-in-order (drag or arrow buttons), think-then-reveal, before/after image slider, reflection with saved and downloadable answers |
 | Animation | None | Blocks fade, rise, zoom or slide in as learners scroll; respects the device's reduced-motion setting |
 
 ## Install (developer mode)
