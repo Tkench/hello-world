@@ -119,7 +119,8 @@ ${markers.map((m, i) => `<section class="block-wrapper${i === 1 ? ' dark' : ''}"
   // ---- Blocks: add flip cards and a stat row, and grab their codes
   await panel.getByRole('tab', { name: 'Blocks' }).click();
   await shot(page, '3-blocks-gallery');
-  await panel.locator('.tile', { hasText: 'Flip cards' }).click();
+  assert.equal(await panel.locator('.tile strong', { hasText: 'Flip card carousel' }).count(), 1);
+  await panel.locator('.tile').filter({ has: page.locator('strong', { hasText: /^Flip cards$/ }) }).click();
   const flipCode = (await panel.locator('.code-box code').textContent()).trim();
   assert.match(flipCode, /^\[\[RiseUp: flipcards [a-z0-9]{6}\]\]$/);
   await panel.locator('.preview .ru-flip').first().waitFor();
