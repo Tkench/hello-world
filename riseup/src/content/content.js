@@ -286,6 +286,16 @@
     blender: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="7" r="4"/><circle cx="10" cy="7" r="4"/><path d="M2 14h12" stroke-linecap="round"/></svg>',
     conversation: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2 3h8v5H5l-3 2.5z"/><path d="M10 6h4v5.5L12 10H7.5V8"/></svg>',
     chart: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5V8l4.5 3" stroke-linecap="round"/></svg>',
+    magnifier: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.3 10.3 14 14" stroke-linecap="round"/><path d="M5 7h4M7 5v4" stroke-linecap="round"/></svg>',
+    noteprompt: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="2" width="10" height="12" rx="1.5"/><path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3" stroke-linecap="round"/></svg>',
+    animtext: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 4h7M6.5 4v9"/><path d="M11 9l1.5-1.5L14 9M12.5 7.5v5"/></svg>',
+    statsreveal: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 3v10M5 6h8.5M5 10h6"/></svg>',
+    timer: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8" cy="9" r="5"/><path d="M8 6.5V9l1.8 1.2M6.5 2h3"/></svg>',
+    confidence: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M5.5 9.5c.7 1 1.5 1.5 2.5 1.5s1.8-.5 2.5-1.5"/><path d="M6 6.5v.01M10 6.5v.01"/></svg>',
+    certificate: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="8.5" rx="1"/><circle cx="8" cy="11" r="2"/><path d="M7 12.8 6.5 15l1.5-.8 1.5.8-.5-2.2M5 5.5h6" stroke-linecap="round"/></svg>',
+    swipe: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="5" y="2" width="7" height="10" rx="1.5" transform="rotate(12 8.5 7)"/><path d="M2 14h4M10 14h4M3.5 12.8 2 14l1.5 1.2M12.5 12.8 14 14l-1.5 1.2" stroke-linecap="round"/></svg>',
+    divider: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 8h4.5M9.5 8H14"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/></svg>',
+    checklist: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5l1 1 2-2M2.5 10.5l1 1 2-2M8 4.5h5.5M8 10.5h5.5"/></svg>',
     hotspots: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2.5" width="12" height="11" rx="2"/><circle cx="6" cy="7" r="1.5" fill="currentColor"/><circle cx="10.5" cy="9.5" r="1.5" fill="currentColor"/></svg>',
     sort: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 4h7M6 8h7M6 12h7M3 3.5v9M2 11l1 1.5L4 11"/></svg>',
     reveal: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/></svg>',
@@ -395,7 +405,9 @@
       acc(T, 'widget', 'Floating space', [
         h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: Boolean(wdg.enabled), onchange: (e) => { wdg.enabled = e.target.checked; saveConfig(); panel.render(); } }), 'Show a floating space learners can move around'),
         wdg.enabled ? [
-          field('Shows', selectInput(wdg.type, [['score', 'Score from activities'], ['collection', 'Collection (use Collectable blocks)'], ['menu', 'Lesson menu']], (v) => { wdg.type = v; saveConfig(); })),
+          h('p', { class: 'empty', style: 'margin-top:4px' }, 'Tools to include (each gets a tab):'),
+          [['score', 'Score from activities'], ['collection', 'Collection (Collectable blocks)'], ['menu', 'Lesson menu'], ['notes', 'Notepad, saved as a PDF'], ['checklist', 'Checklist (Animated checklists set to floating)']].map(([k, lab]) =>
+            h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: Boolean(wdg.tools && wdg.tools[k]), onchange: (e) => { wdg.tools = Object.assign({}, wdg.tools, { [k]: e.target.checked }); saveConfig(); } }), lab)),
           field('Title', h('input', { type: 'text', value: wdg.title || '', placeholder: 'Default', oninput: (e) => { wdg.title = e.target.value; saveConfig({ silent: true }); } })),
           h('p', { class: 'empty' }, 'Appears in Preview and the published course. Learners can drag it anywhere; progress is kept on their device.'),
         ] : null,

@@ -42,6 +42,7 @@
       '<script src="riseup/text-rules.js"></script>',
       '<script src="riseup/components.js"></script>',
       '<script src="riseup/components-more.js"></script>',
+      '<script src="riseup/components-extra.js"></script>',
       '<script src="riseup/nav.js"></script>',
       '<script src="riseup/widget.js"></script>',
       '<script src="riseup/riseup-runtime.js"></script>',
@@ -136,6 +137,7 @@
     zip.file(dir + 'riseup/components.js', assets.componentsJs || '');
     zip.file(dir + 'riseup/nav.js', assets.navJs || '');
     zip.file(dir + 'riseup/components-more.js', assets.componentsMoreJs || '');
+    zip.file(dir + 'riseup/components-extra.js', assets.componentsExtraJs || '');
     zip.file(dir + 'riseup/widget.js', assets.widgetJs || '');
     zip.file(dir + 'riseup/riseup-runtime.js', assets.runtimeJs);
     zip.file(index, injectIntoHtml(html, { fontCssHref }));

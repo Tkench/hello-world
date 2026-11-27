@@ -337,6 +337,53 @@
   };
 
   // ================================================================== Pop-up
+  /**
+   * Open a modal dialog over the page, themed like the block it came from.
+   * Focus moves in, Tab stays inside, Esc or the close buttons return focus.
+   * content: { title, body, image, closeText }
+   */
+  function openDialog(doc, opener, content) {
+    const c = content || {};
+    const id = 'ru-pop-' + Math.random().toString(36).slice(2, 8);
+    let overlay = null;
+    function close() {
+      if (!overlay) return;
+      overlay.remove();
+      overlay = null;
+      doc.removeEventListener('keydown', onKey, true);
+      if (opener && opener.focus) opener.focus();
+    }
+    function onKey(e) {
+      if (!overlay) return;
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+      if (e.key === 'Tab') {
+        const f = Array.from(overlay.querySelectorAll('button, a[href], [tabindex="0"]'));
+        if (!f.length) return;
+        if (e.shiftKey && doc.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+        else if (!e.shiftKey && doc.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+      }
+    }
+    const rootBlock = opener && opener.closest ? opener.closest('.ru-c') : null;
+    const img = safeUrl(c.image, 'image');
+    const closeBtn = button(doc, c.closeText || 'Close', '', close);
+    const dialog = el(doc, 'div', { class: 'ru-pop', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': id + '-t' }, [
+      el(doc, 'button', { type: 'button', class: 'ru-pop-x', 'aria-label': 'Close', text: '\u00d7', onclick: close }),
+      img ? el(doc, 'img', { src: img, alt: '', class: 'ru-pop-img' }) : null,
+      el(doc, 'div', { class: 'ru-pop-body' }, [
+        el(doc, 'h3', { id: id + '-t', class: 'ru-title', text: c.title || '' }),
+        el(doc, 'p', { class: 'ru-pop-text', text: c.body || '' }),
+        el(doc, 'div', { class: 'ru-actions' }, [closeBtn]),
+      ]),
+    ]);
+    // The pop-up sits on top of the whole page but keeps the block's theme.
+    overlay = el(doc, 'div', { class: 'ru-c ru-pop-overlay', 'data-riseup-ignore': '', style: rootBlock ? rootBlock.getAttribute('style') : null }, [dialog]);
+    overlay.addEventListener('click', (ev) => { if (ev.target === overlay) close(); });
+    doc.body.appendChild(overlay);
+    doc.addEventListener('keydown', onKey, true);
+    closeBtn.focus();
+    return { close };
+  }
+
   TYPES.popup = {
     label: 'Pop-up', kind: 'interactive',
     description: 'A button, card or link that opens a pop-up box with more to read. Learners close it and carry on.',
@@ -351,48 +398,7 @@
     ],
     defaults: () => ({ triggerStyle: 'card', triggerText: 'Why does this matter?', cardText: 'Select to find out.', title: 'Why it matters', body: 'Most workplace fires start small. What people do in the first two minutes decides how far they spread.\n\nRaising the alarm early is the single most effective thing you can do.', image: '', closeText: 'Got it' }),
     render(doc, d) {
-      const id = 'ru-pop-' + Math.random().toString(36).slice(2, 8);
-      let overlay = null;
-      let opener = null;
-      function close() {
-        if (!overlay) return;
-        overlay.remove();
-        overlay = null;
-        doc.removeEventListener('keydown', onKey, true);
-        if (opener) opener.focus();
-      }
-      function onKey(e) {
-        if (!overlay) return;
-        if (e.key === 'Escape') { e.preventDefault(); close(); }
-        if (e.key === 'Tab') { // keep focus inside the pop-up
-          const f = Array.from(overlay.querySelectorAll('button, a[href], [tabindex="0"]'));
-          if (!f.length) return;
-          if (e.shiftKey && doc.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
-          else if (!e.shiftKey && doc.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
-        }
-      }
-      function open(e) {
-        opener = e.currentTarget;
-        const rootBlock = opener.closest('.ru-c');
-        const img = safeUrl(d.image, 'image');
-        const closeBtn = button(doc, d.closeText || 'Close', '', close);
-        const dialog = el(doc, 'div', { class: 'ru-pop', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': id + '-t' }, [
-          el(doc, 'button', { type: 'button', class: 'ru-pop-x', 'aria-label': 'Close', text: '×', onclick: close }),
-          img ? el(doc, 'img', { src: img, alt: '', class: 'ru-pop-img' }) : null,
-          el(doc, 'div', { class: 'ru-pop-body' }, [
-            el(doc, 'h3', { id: id + '-t', class: 'ru-title', text: d.title || '' }),
-            el(doc, 'p', { class: 'ru-pop-text', text: d.body || '' }),
-            el(doc, 'div', { class: 'ru-actions' }, [closeBtn]),
-          ]),
-        ]);
-        // The pop-up sits on top of the whole page but keeps the block's theme.
-        overlay = el(doc, 'div', { class: 'ru-c ru-pop-overlay', 'data-riseup-ignore': '', style: rootBlock ? rootBlock.getAttribute('style') : null }, [dialog]);
-        if (rootBlock && rootBlock.classList.contains('ru-on-dark')) overlay.classList.add('ru-pop-from-dark');
-        overlay.addEventListener('click', (ev) => { if (ev.target === overlay) close(); });
-        doc.body.appendChild(overlay);
-        doc.addEventListener('keydown', onKey, true);
-        closeBtn.focus();
-      }
+      const open = (e) => openDialog(doc, e.currentTarget, d);
       const style = ['button', 'card', 'link'].includes(d.triggerStyle) ? d.triggerStyle : 'button';
       let trigger;
       if (style === 'card') {
@@ -1088,5 +1094,5 @@
 `;
   RU.COMPONENT_CSS += MORE_CSS;
 
-  return { progress, parseGaps, PROGRESS_PREFIX };
+  return { progress, parseGaps, PROGRESS_PREFIX, openDialog };
 });

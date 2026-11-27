@@ -42,7 +42,7 @@
       componentTheme: { accent: '', radius: 12, matchCourse: true }, // matchCourse: take colour, fonts and button shape from the Rise course
       animation: { type: 'none', duration: 700 }, // scroll animation for blocks
       navigation: { layout: 'rise', style: 'light', progress: true, logo: '', title: '' }, // see nav.js
-      widget: { enabled: false, type: 'score', title: '' }, // floating space, see widget.js
+      widget: { enabled: false, tools: { score: true }, title: '' }, // floating space, see widget.js
     };
   }
 
@@ -60,6 +60,9 @@
     out.animation = Object.assign(base.animation, (cfg && cfg.animation) || {});
     out.navigation = Object.assign(base.navigation, (cfg && cfg.navigation) || {});
     out.widget = Object.assign(base.widget, (cfg && cfg.widget) || {});
+    // Older settings chose one tool with `type`.
+    if (cfg && cfg.widget && !cfg.widget.tools && cfg.widget.type) out.widget.tools = { [cfg.widget.type]: true };
+    out.widget.tools = Object.assign({}, out.widget.tools);
     out.version = CONFIG_VERSION;
     return out;
   }

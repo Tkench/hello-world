@@ -696,3 +696,141 @@ test('progress still works when the browser blocks storage', () => {
   more.progress.update(fakeWin, 'blocked', (p) => { p.scores.q = { score: 1, max: 1 }; });
   assert.deepEqual(more.progress.read(fakeWin, 'blocked').scores.q, { score: 1, max: 1 });
 });
+
+// ------------------------------------------------------------------ batch 3
+const extra = require('../src/shared/components-extra.js');
+
+test('every batch 3 block renders its defaults', () => {
+  const dom = mkdom();
+  for (const type of ['magnifier', 'noteprompt', 'animtext', 'statsreveal', 'timer', 'confidence', 'certificate', 'swipe', 'divider', 'checklist']) {
+    const node = comps.renderComponent(dom.window.document, { id: 'b3' + type, type, data: comps.TYPES[type].defaults() }, { courseKey: 'c3', static: true });
+    assert.ok(node && node.textContent.length >= 0, type);
+  }
+  for (const [style] of extra.DIVIDERS) {
+    const n = comps.renderComponent(dom.window.document, { id: 'dv', type: 'divider', data: { style, text: 'Hi', number: '1' } });
+    assert.ok(n.querySelector('.ru-dv-' + style), style);
+  }
+  assert.equal(extra.DIVIDERS.length, 10);
+});
+
+test('notes PDF is a valid PDF with the learner\'s text', () => {
+  const bytes = extra.makePdf({ title: 'My notes', subtitle: 'today', sections: [{ heading: 'Prompt (one)', text: 'Line one\nA “quoted” — long line '.repeat(40) }] });
+  const s = Buffer.from(bytes).toString('latin1');
+  assert.match(s, /^%PDF-1\.4/);
+  assert.match(s, /%%EOF\n$/);
+  assert.match(s, /\(Prompt \\\(one\\\)\) Tj/, 'brackets escaped');
+  assert.match(s, /A "quoted" - long line/, 'smart quotes made safe');
+  // xref offsets point at the objects
+  const xref = Number(s.match(/startxref\n(\d+)/)[1]);
+  assert.equal(s.slice(xref, xref + 4), 'xref');
+  const first = Number(s.slice(xref).split('\n')[3].slice(0, 10));
+  assert.equal(s.slice(first, first + 7), '1 0 obj');
+  assert.ok(/\/Count (\d+)/.exec(s)[1] >= 1);
+});
+
+test('note prompts save to the notepad and the PDF includes them', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const comp = { id: 'np1', type: 'noteprompt', data: { prompt: 'What will you change?' } };
+  const node = comps.renderComponent(doc, comp, { courseKey: 'nk' });
+  doc.body.appendChild(node);
+  more.progress.update(dom.window, 'nk', (p) => { p.notes = { free: { text: 'Free note' }, np1: { text: 'Raise the alarm sooner' } }; });
+  const s = Buffer.from(extra.notesPdf(doc, 'nk', [comp])).toString('latin1');
+  assert.match(s, /\(My notes\) Tj/);
+  assert.match(s, /\(What will you change\?\) Tj/);
+  assert.match(s, /\(Raise the alarm sooner\) Tj/);
+});
+
+test('confidence check remembers the first answer and compares later', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const base = comps.TYPES.confidence.defaults();
+  const before = comps.renderComponent(doc, { id: 'cf1', type: 'confidence', data: Object.assign({}, base, { stage: 'before' }) }, { courseKey: 'ck3' });
+  doc.body.appendChild(before);
+  before.querySelectorAll('input')[1].checked = true;
+  before.querySelectorAll('input')[1].dispatchEvent(new dom.window.Event('change'));
+  btnText(before, 'Submit').click();
+  assert.match(before.querySelector('.ru-cf-msg').textContent, /ask again/);
+  const after = comps.renderComponent(doc, { id: 'cf2', type: 'confidence', data: Object.assign({}, base, { stage: 'after' }) }, { courseKey: 'ck3' });
+  doc.body.appendChild(after);
+  assert.match(after.querySelector('.ru-cf-note').textContent, /Earlier you chose “Not really”/);
+  assert.ok(after.querySelectorAll('.ru-cf-opt')[1].classList.contains('was-before'));
+  after.querySelectorAll('input')[3].checked = true;
+  after.querySelectorAll('input')[3].dispatchEvent(new dom.window.Event('change'));
+  btnText(after, 'Submit').click();
+  assert.match(after.querySelector('.ru-cf-msg').className, /is-up/);
+  assert.match(after.querySelector('.ru-cf-msg').textContent, /Before: Not really\s+→\s+Now: Usually/);
+  const fresh = comps.renderComponent(doc, { id: 'cf3', type: 'confidence', data: Object.assign({}, base, { stage: 'after', pair: 'other' }) }, { courseKey: 'ck3' });
+  assert.match(fresh.querySelector('.ru-cf-note').textContent, /couldn’t find your earlier answer/);
+});
+
+test('swipe cards: buttons and arrow keys answer, feedback each time, score at the end', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const scores = [];
+  doc.addEventListener('riseup:score', (e) => scores.push(e.detail));
+  const node = comps.renderComponent(doc, { id: 'sw1', type: 'swipe', data: comps.TYPES.swipe.defaults() }, { static: true });
+  doc.body.appendChild(node);
+  const yesBtn = node.querySelector('.ru-sw-yes');
+  const noBtn = node.querySelector('.ru-sw-no');
+  noBtn.click(); // fire door: no (correct)
+  assert.match(node.querySelector('.ru-sw-fb').textContent, /Correct: Unsafe/);
+  return new Promise((r) => setTimeout(r, 5)).then(async () => {
+    node.querySelector('.ru-sw-card[tabindex]').dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })); // cable: yes, answered no (wrong)
+    assert.match(node.querySelector('.ru-sw-fb').textContent, /Not quite: Safe/);
+    await new Promise((r) => setTimeout(r, 5));
+    noBtn.click();
+    await new Promise((r) => setTimeout(r, 5));
+    yesBtn.click();
+    await new Promise((r) => setTimeout(r, 5));
+    assert.match(node.querySelector('.ru-sw-score').textContent, /3 of 4 correct/);
+    assert.deepEqual(scores, [{ id: 'sw1', score: 3, max: 4 }]);
+  });
+});
+
+test('checklist strikes through, persists, and syncs with the floating checklist', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const comp = { id: 'cl1', type: 'checklist', data: comps.TYPES.checklist.defaults() };
+  const node = comps.renderComponent(doc, comp, { courseKey: 'clk' });
+  doc.body.appendChild(node);
+  const w = widgetLib.startWidget(doc, { enabled: true, tools: { checklist: true, notes: true } }, { courseKey: 'clk', components: [comp] });
+  const inputs = node.querySelectorAll('.ru-cl-item input');
+  inputs[0].checked = true; inputs[0].dispatchEvent(new dom.window.Event('change'));
+  assert.ok(node.querySelectorAll('.ru-cl-item')[0].classList.contains('is-done'));
+  assert.equal(node.querySelector('.ru-cl-count').textContent, '1 of 4 done');
+  assert.equal(doc.querySelector('.ru-w-label').textContent, 'Checklist1 of 4 done');
+  // tick from the floating checklist; the block follows
+  doc.querySelector('.ru-w-chip').dispatchEvent(new dom.window.MouseEvent('click', { detail: 0 }));
+  assert.equal(doc.querySelectorAll('.ru-w-tab').length, 2, 'one tab per tool');
+  const wInputs = doc.querySelectorAll('.ru-w-check input');
+  wInputs[1].checked = true; wInputs[1].dispatchEvent(new dom.window.Event('change'));
+  assert.ok(node.querySelectorAll('.ru-cl-item')[1].classList.contains('is-done'));
+  // a fresh render remembers
+  const again = comps.renderComponent(doc, comp, { courseKey: 'clk' });
+  assert.equal(again.querySelector('.ru-cl-count').textContent, '2 of 4 done');
+  w.stop();
+});
+
+test('older single-tool floating space settings still work', () => {
+  const c = config.normalizeCourseConfig({ widget: { enabled: true, type: 'collection' } });
+  assert.deepEqual(c.widget.tools, { collection: true });
+  assert.deepEqual(config.normalizeCourseConfig({}).widget.tools, { score: true });
+});
+
+test('stats reveal shows one statistic at a time and replays', () => {
+  const dom = mkdom();
+  const doc = dom.window.document;
+  const node = comps.renderComponent(doc, { id: 'sr1', type: 'statsreveal', data: comps.TYPES.statsreveal.defaults() });
+  doc.body.appendChild(node);
+  assert.equal(node.querySelectorAll('.ru-st-row').length, 0);
+  btnText(node, 'Reveal').click();
+  assert.equal(node.querySelectorAll('.ru-st-row').length, 1);
+  btnText(node, 'Reveal next').click();
+  btnText(node, 'Reveal next').click();
+  assert.equal(node.querySelector('.ru-st-count').textContent, '3 of 3 statistics revealed');
+  btnText(node, 'Learn more').click();
+  assert.ok(doc.querySelector('.ru-pop-overlay'));
+  btnText(node, 'Replay').click();
+  assert.equal(node.querySelectorAll('.ru-st-row').length, 1);
+});
