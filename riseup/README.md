@@ -36,6 +36,10 @@ Before building, Rise's current features were checked (November 2026) so RiseUp 
   2. **Course-wide find and replace**: export the course's translation file (XLIFF) from Rise, replace text here, import the new file back into Rise.
   3. **Back up and share settings** as JSON.
 
+**Safety:** in the Rise editor, RiseUp never changes Rise's own page: it only adds its own styles, highlights, Edit chips and panel. Blocks, menus and styled text are only drawn in Rise's Preview (a frame, or a page at a preview/share address) and in published courses, and the runtime stops itself if the page keeps undoing its changes. `npm run test:safety` checks this against a stand-in app that re-renders whenever anything else touches it.
+
+**Back up:** settings and blocks live in this browser only, and removing the extension deletes them. Use **Back up** in the panel (or **Back up all courses** in Publish & tools) and **Restore a backup** to bring them back.
+
 Settings and blocks are stored per course in the browser (`chrome.storage.local`). A block's code only works in browsers that have that course's RiseUp settings, so use **Export settings** / **Import** to share a course with your team, and keep exports as a backup.
 
 The interface follows the Omniplex Learning brand guidelines: Dark grey surfaces, Poppins (bundled in `fonts/` under the SIL Open Font License), and the red-orange gradient for small highlights only.

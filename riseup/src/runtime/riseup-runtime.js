@@ -118,8 +118,22 @@
       }
     }
 
+    // Safety brake: if the page keeps undoing RiseUp's changes (a framework
+    // re-rendering what RiseUp just changed), stop instead of fighting it.
+    var runs = [];
+    var halted = false;
     function apply() {
       pending = false;
+      if (halted) return;
+      var now = Date.now();
+      runs.push(now);
+      while (runs.length && now - runs[0] > 3000) runs.shift();
+      if (runs.length > 60) {
+        halted = true;
+        observer.disconnect();
+        if (window.console) console.warn('RiseUp paused: the page kept changing while RiseUp was updating it.');
+        return;
+      }
       observer.disconnect();
       try {
         mountMarkers(doc.body);
@@ -150,6 +164,7 @@
     apply();
 
     return {
+      get halted() { return halted; },
       refresh: schedule,
       stop: function () {
         observer.disconnect();

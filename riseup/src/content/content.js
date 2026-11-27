@@ -32,7 +32,8 @@
       const { 'riseup:activeCourse': active } = await store.get('riseup:activeCourse');
       if (active) state.courseId = active;
     }
-    const got = await store.get([courseKey(), RU.COLORS_KEY, 'riseup:settings', 'riseup:ui']);
+    const got = await store.get([courseKey(), RU.COLORS_KEY, 'riseup:settings', 'riseup:ui', 'riseup:lastBackup']);
+    state.lastBackup = got['riseup:lastBackup'] || 0;
     state.config = RU.normalizeCourseConfig(got[courseKey()]);
     state.colors = Object.assign(RU.defaultColors(), got[RU.COLORS_KEY] || {});
     state.settings = Object.assign(state.settings, got['riseup:settings'] || {});
@@ -95,9 +96,22 @@
   const fontFaces = [];
   let runtime = null;
 
-  function isEditorPage() {
-    return /\/author(ing)?\//.test(location.href) || Boolean(document.querySelector('[contenteditable=""], [contenteditable="true"]'));
+  /**
+   * Is it safe to change this page's DOM (render blocks, menus, styled text)?
+   *
+   * Only in a frame, or a page at a preview/share address, that is clearly a
+   * preview: never the Rise app itself, whatever it looks like while loading, because changing the DOM of Rise's
+   * own app can stop it from loading. Everywhere else RiseUp only adds its own
+   * styles, highlights and panel, and leaves Rise's elements alone.
+   */
+  function isPreviewFrame() {
+    // A top-level page only counts when its address clearly says it's a preview or share link.
+    if (IS_TOP && !/^\/(preview|share|review)\//i.test(location.pathname)) return false;
+    if (/\/(author|authoring|manage|dashboard)(\/|$|\?|#)/i.test(location.pathname + location.hash)) return false;
+    if (document.querySelector('[contenteditable=""], [contenteditable="true"]')) return false;
+    return Boolean(document.querySelector('[data-block-id], .blocks-lesson, .lesson-main, a[href*="#/lessons/"]'));
   }
+  const isEditorPage = () => !isPreviewFrame();
 
   function highlightCss() {
     if (!(globalThis.CSS && CSS.highlights)) return '';
@@ -117,7 +131,7 @@
       el.id = STYLE_ID;
       (document.head || document.documentElement).appendChild(el);
     }
-    el.textContent = RU.buildCss(state.config) + highlightCss();
+    el.textContent = RU.buildCss(state.config, { editor: isEditorPage() }) + highlightCss();
   }
 
   async function applyFonts() {
@@ -213,7 +227,12 @@
   let markTimer = null;
   const observer = new MutationObserver((records) => {
     if (records.every((r) => panel.host && panel.host.contains(r.target))) return;
-    if (!isEditorPage()) return; // the runtime watches the page itself
+    if (runtime) {
+      // A preview frame that turns editable (or stops looking like a preview) gets left alone.
+      if (isEditorPage()) { clearTimeout(markTimer); markTimer = setTimeout(applyMarks, 300); }
+      return; // otherwise the runtime watches the page itself
+    }
+    if (!IS_TOP && isPreviewFrame()) { clearTimeout(markTimer); markTimer = setTimeout(applyMarks, 300); return; } // a preview finished loading
     clearTimeout(markTimer);
     markTimer = setTimeout(() => { observer.disconnect(); try { applyEditorMarks(); } finally { observe(); } }, 300);
   });
@@ -515,6 +534,7 @@
     const entries = Object.entries(RU.TYPES);
     const theme = cfg.componentTheme;
     return [
+      backupDue() ? h('p', { class: 'lead', style: 'margin-bottom:6px' }, 'Your RiseUp work is saved in this browser only, and removing the extension deletes it. ', h('button', { class: 'link', type: 'button', onclick: backupAll }, 'Back up now')) : null,
       cfg.components.length ? [
         h('p', { class: 'group-label' }, 'In this course'),
         h('ul', { class: 'list' }, cfg.components.map((c) => h('li', { class: 'item' },
@@ -824,6 +844,31 @@
     ];
   }
 
+  // ================================================================ backup
+  /** Download every course's RiseUp settings and blocks as one file. */
+  async function backupAll() {
+    const all = await store.get(null);
+    const courses = {};
+    for (const [k, v] of Object.entries(all)) if (k.startsWith(RU.COURSE_KEY_PREFIX)) courses[k.slice(RU.COURSE_KEY_PREFIX.length)] = v;
+    const file = { riseup: RU.CONFIG_VERSION, kind: 'backup', savedAt: new Date().toISOString(), courses, colors: all[RU.COLORS_KEY] || null };
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(file, null, 1)], { type: 'application/json' }));
+    a.download = 'riseup-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.documentElement.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+    state.lastBackup = Date.now();
+    store.set({ 'riseup:lastBackup': state.lastBackup });
+    panel.status('Backup downloaded. Keep it somewhere safe; restore it from Publish & tools.', 'ok');
+    panel.render();
+  }
+
+  function backupDue() {
+    const hasWork = state.config.components.length || state.config.textRules.length;
+    return hasWork && (!state.lastBackup || Date.now() - state.lastBackup > 3 * 24 * 3600 * 1000);
+  }
+
   // ================================================================ shell
   function openTools() {
     chrome.runtime.sendMessage({ type: 'riseup:openTools', courseId: state.courseId });
@@ -1003,7 +1048,9 @@
           h('div', { class: 'foot' },
             h('label', { class: 'switch' }, h('input', { type: 'checkbox', checked: state.settings.enabled, 'aria-label': 'Apply RiseUp',
               onchange: (e) => { state.settings.enabled = e.target.checked; store.set({ 'riseup:settings': state.settings }); } }), state.settings.enabled ? 'On' : 'Off'),
-            h('button', { class: 'btn', type: 'button', onclick: openTools }, 'Publish & tools')));
+            h('span', { class: 'row', style: 'flex-wrap:nowrap' },
+              h('button', { class: 'btn' + (backupDue() ? ' primary' : ''), type: 'button', title: 'Download a backup of all your RiseUp work', onclick: backupAll }, 'Back up'),
+              h('button', { class: 'btn', type: 'button', onclick: openTools }, 'Publish & tools'))));
         parts.push(panelEl);
       }
       wrap.replaceChildren(...parts);

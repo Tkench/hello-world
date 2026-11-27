@@ -58,7 +58,13 @@
 
   <section class="card">
     <h2>3. Back up and share settings</h2>
-    <p class="hint">Export this course's RiseUp settings to share with your team or reuse in another course.</p>
+    <p class="hint">RiseUp keeps your work in this browser only, and removing the extension deletes it. Back up regularly. A backup holds every course; restoring it brings them all back.</p>
+    <div class="row">
+      <button class="btn primary" id="backup-all" type="button">Back up all courses</button>
+      <button class="btn" id="restore" type="button">Restore a backup</button>
+      <input type="file" id="restore-input" accept=".json,application/json" hidden>
+    </div>
+    <p class="hint">To share one course with your team or reuse its settings in another course:</p>
     <div class="row">
       <button class="btn" id="export" type="button">Export settings</button>
       <button class="btn" id="import" type="button">Import into this course</button>

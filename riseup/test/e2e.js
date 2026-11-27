@@ -221,6 +221,21 @@ ${markers.map((m, i) => `<section class="block-wrapper${i === 1 ? ' dark' : ''}"
   assert.match(html, /riseup\/components\.js[\s\S]*riseup\/riseup-runtime\.js/);
   await shot(tools, '8-tools', { fullPage: true });
 
+  // Back up everything, delete the course's settings, restore: the blocks come back.
+  const bdl = tools.waitForEvent('download');
+  await tools.click('#backup-all');
+  const backupPath = await (await bdl).path();
+  const backup = JSON.parse(fs.readFileSync(backupPath, 'utf8'));
+  assert.equal(backup.courses.TESTCOURSE123.components.length, 2);
+  tools.once('dialog', (d) => d.accept());
+  await tools.click('#delete');
+  await tools.locator('#backup-status', { hasText: 'Deleted' }).waitFor();
+  assert.equal(await sw.evaluate(async () => Object.keys(await chrome.storage.local.get('riseup:course:TESTCOURSE123')).length), 0);
+  tools.once('dialog', (d) => d.accept());
+  await tools.setInputFiles('#restore-input', backupPath);
+  await tools.locator('#backup-status', { hasText: 'Restored 1 course' }).waitFor();
+  assert.equal(await sw.evaluate(async () => (await chrome.storage.local.get('riseup:course:TESTCOURSE123'))['riseup:course:TESTCOURSE123'].components.length), 2);
+
   // Open the published course from disk: blocks work without the extension.
   const dir = path.join(profile, 'unzipped');
   for (const [name, f] of Object.entries(patched.files)) {

@@ -199,6 +199,38 @@
     } catch (e) { status('backup-status', 'Couldn’t import: ' + (e.message || e), 'error'); }
   });
 
+  $('backup-all').addEventListener('click', async () => {
+    const all = await store.get(null);
+    const out = {};
+    for (const [k, v] of Object.entries(all)) if (k.startsWith(RU.COURSE_KEY_PREFIX)) out[k.slice(RU.COURSE_KEY_PREFIX.length)] = v;
+    if (!Object.keys(out).length) return status('backup-status', 'Nothing to back up yet.', 'error');
+    download('riseup-backup-' + new Date().toISOString().slice(0, 10) + '.json',
+      JSON.stringify({ riseup: RU.CONFIG_VERSION, kind: 'backup', savedAt: new Date().toISOString(), courses: out, colors: all[RU.COLORS_KEY] || null }, null, 1), 'application/json');
+    await store.set({ 'riseup:lastBackup': Date.now() });
+    status('backup-status', 'Backed up ' + Object.keys(out).length + ' course(s).', 'ok');
+  });
+
+  $('restore').addEventListener('click', () => $('restore-input').click());
+  $('restore-input').addEventListener('change', async () => {
+    const file = $('restore-input').files[0];
+    $('restore-input').value = '';
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      const courses = data && data.courses;
+      if (!courses || typeof courses !== 'object') throw new Error('This isn\u2019t a RiseUp backup. For a single-course file, choose the course above and use Import.');
+      const ids = Object.keys(courses);
+      if (!confirm('Restore ' + ids.length + ' course(s) from this backup? Courses already here with the same ID are replaced.')) return;
+      const writes = {};
+      for (const id of ids) writes[RU.COURSE_KEY_PREFIX + id] = RU.normalizeCourseConfig(courses[id]);
+      if (data.colors) writes[RU.COLORS_KEY] = data.colors;
+      await store.set(writes);
+      await loadCourses();
+      renderCourses(ids[0]);
+      status('backup-status', 'Restored ' + ids.length + ' course(s). Reload any open Rise tabs.', 'ok');
+    } catch (e) { status('backup-status', 'Couldn\u2019t restore: ' + (e.message || e), 'error'); }
+  });
+
   $('delete').addEventListener('click', async () => {
     const id = selectedId();
     if (!id) return;
