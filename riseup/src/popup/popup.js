@@ -13,8 +13,13 @@
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }).catch(() => []);
   const onRise = tab && /^https:\/\/rise\.articulate\.com\//.test(tab.url || '');
   document.getElementById('where').textContent = onRise
-    ? 'Open the RiseUp button at the bottom right of Rise to style this course.'
-    : 'Open a course in Rise 360 (rise.articulate.com) to use RiseUp.';
+    ? 'Use the RiseUp button in Rise. Drag it to move it.'
+    : 'Open a course in Rise 360 to use RiseUp. Drag the RiseUp button to move it.';
+
+  document.getElementById('reset').addEventListener('click', async () => {
+    await store.set({ 'riseup:ui': { x: 1, y: 1 } });
+    document.getElementById('where').textContent = 'Done. The button is back in the bottom right.';
+  });
 
   document.getElementById('tools').addEventListener('click', () => {
     chrome.tabs.create({ url: chrome.runtime.getURL('src/tools/tools.html') });

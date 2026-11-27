@@ -38,6 +38,9 @@
       fonts: [], // [{ family: 'Lora', weights: [400, 700], italic: true }]
       textStyles: [], // see textRules.js for the shape
       textRules: [], // [{ id, text, styleId, matchCase, wholeWord }]
+      components: [], // RiseUp blocks: [{ id, type, name, data }] (see components.js)
+      componentTheme: { accent: '', radius: 12 }, // accent '' = use the course's Rise theme colour
+      animation: { type: 'none', duration: 700 }, // scroll animation for blocks
     };
   }
 
@@ -48,9 +51,11 @@
   /** Fill in any missing keys so configs saved by older versions keep working. */
   function normalizeCourseConfig(cfg) {
     const base = defaultCourseConfig();
-    const out = Object.assign(base, cfg || {});
+    const out = Object.assign(defaultCourseConfig(), cfg || {});
     out.globalStyles = Object.assign(defaultGlobalStyles(), (cfg && cfg.globalStyles) || {});
-    for (const k of ['fonts', 'textStyles', 'textRules']) if (!Array.isArray(out[k])) out[k] = [];
+    for (const k of ['fonts', 'textStyles', 'textRules', 'components']) if (!Array.isArray(out[k])) out[k] = [];
+    out.componentTheme = Object.assign(base.componentTheme, (cfg && cfg.componentTheme) || {});
+    out.animation = Object.assign(base.animation, (cfg && cfg.animation) || {});
     out.version = CONFIG_VERSION;
     return out;
   }

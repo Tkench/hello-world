@@ -12,30 +12,37 @@ Before building, Rise's current features were checked (November 2026) so RiseUp 
 | Text | Heading and body font (including uploaded WOFF fonts), size, line height, letter spacing, colour | Text styles for **any word or phrase**: any Google Font, weight, italic, small caps, letter case, gradient text, shadow, highlight |
 | Find and replace | Nothing built in (a beta has been mentioned in the community) | Find and replace in the open lesson, and **course-wide** find and replace through Rise's XLIFF translation export/import |
 | Colour | Colour fields with hex input; brand colours with Brands (beta) | Eyedropper that picks from anywhere on screen, saved palettes, recent colours, WCAG contrast checker |
+| Design templates | Fixed block types and layouts | Hero banner, stat row with counting numbers, timeline, quote card, section header |
+| Interactive blocks | Accordion, tabs, flashcards, labelled graphic, sorting, knowledge checks | Flip cards, image hotspots, put-in-order (drag or arrow buttons), think-then-reveal, before/after image slider, reflection with saved and downloadable answers |
+| Animation | None | Blocks fade, rise, zoom or slide in as learners scroll; respects the device's reduced-motion setting |
 
 ## Install (developer mode)
 
 1. Download or clone this repository.
 2. In Chrome or Edge, open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and choose the `riseup` folder.
-3. Open a course at rise.articulate.com. A **RiseUp** button appears at the bottom right.
+3. Open a course at rise.articulate.com. A **RiseUp** button appears at the bottom right. Drag it anywhere; it remembers where you put it. The toolbar menu can move it back to the corner.
 
 ## Using it
 
 - **Styles tab**: course-wide styling. Changes show immediately in the editor.
 - **Text tab**: add Google Fonts, create a text style, select a phrase in your course, and click **Apply to selected text**. Every occurrence of that phrase gets the style. In the editor it's marked with a dotted underline. The full style shows in Rise's Preview and in the published course.
 - **Find tab**: searches the open lesson. **Replace all** goes through Rise's own editing, so Rise saves the change. Text in blocks that aren't editable yet is listed, but has to be clicked into first.
-- **Colors tab**: pick from screen, copy hex codes into Rise's colour fields, keep palettes, check contrast.
+- **Blocks tab**: pick a design template or interactive block, fill it in with a live preview, and click **Copy code**. Paste the code (for example `[[RiseUp: flipcards k3x9q2]]`) into its own Rise **Text** block. In the editor the code gets an **Edit** chip beside it; in Preview and the published course the block appears in its place. Blocks use the course's Rise theme colour unless you set an accent. Uploaded images are resized and packed into the published course.
+- **Colours tab**: pick from screen, copy hex codes into Rise's colour fields, keep palettes, check contrast.
 - **Publish & tools** (button in the panel, or the toolbar icon):
   1. **Publish with RiseUp styling**: publish from Rise as normal (SCORM, xAPI, cmi5, AICC or Web), drop the zip in, and upload the `-riseup.zip` it gives you. Fonts can be included in the package so the course doesn't need Google Fonts at runtime.
   2. **Course-wide find and replace**: export the course's translation file (XLIFF) from Rise, replace text here, import the new file back into Rise.
   3. **Back up and share settings** as JSON.
 
-Settings are stored per course in the browser (`chrome.storage.local`). Use export/import to share them with your team.
+Settings and blocks are stored per course in the browser (`chrome.storage.local`). A block's code only works in browsers that have that course's RiseUp settings, so use **Export settings** / **Import** to share a course with your team, and keep exports as a backup.
+
+The interface follows the Omniplex Learning brand guidelines: Dark grey surfaces, Poppins (bundled in `fonts/` under the SIL Open Font License), and the red-orange gradient for small highlights only.
 
 ## How it works
 
 - `src/content/`: the panel and live styling inside Rise. It never edits Rise's own content (Rise could save the extra markup). Inside the editor, styled phrases are shown with the CSS Custom Highlight API. In previews, they're wrapped in spans.
-- `src/runtime/riseup-runtime.js`: the small script added to published courses. It applies text styles as Rise renders each lesson.
+- `src/shared/components.js`: the blocks: form schema, defaults, rendering and styles for each type. Author text is always inserted as text, never HTML.
+- `src/runtime/riseup-runtime.js`: the script added to published courses (and run in Rise's Preview). It swaps block codes for blocks, runs scroll animations and applies text styles as Rise renders each lesson.
 - `src/shared/`: logic shared by all parts, covered by unit tests: CSS generation, text rules, colour contrast, XLIFF, package patching and font download.
 - `src/tools/`: the publish, XLIFF and backup page.
 

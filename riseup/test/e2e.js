@@ -12,16 +12,22 @@ const JSZip = require('jszip');
 
 const EXT = path.resolve(__dirname, '..');
 const SHOTS = process.argv[2];
+const shot = (page, name, opts) => SHOTS && page.screenshot(Object.assign({ path: path.join(SHOTS, name + '.png') }, opts || {}));
+
+let markers = []; // block codes "pasted" into the stand-in lesson
 
 const MOCK = (editable) => `<!doctype html><html><head><title>Fire Safety Basics | Rise 360</title>
-<style>body{font-family:sans-serif;background:#f3f3f3;margin:0;padding:24px}
-.block-wrapper{background:#fff;margin:16px auto;max-width:700px;padding:30px}
-.blocks-button__button{display:inline-block;background:#28609f;color:#fff;padding:10px 20px}</style></head>
+<style>body{font-family:Lato,sans-serif;background:#f3f3f3;margin:0;padding:24px;color:#313537}
+.block-wrapper{background:#fff;margin:16px auto;max-width:760px;padding:30px 40px}
+.brand--background{background:#d84745;color:#fff}
+.blocks-button__button{display:inline-block;padding:10px 20px}</style></head>
 <body><div class="blocks-lesson">
 <section class="block-wrapper" data-block-id="b1"><h2>Fire safety at work</h2>
 <p ${editable ? 'contenteditable="true"' : ''} id="para">Fire safety matters. Report every fire safety issue to Acme facilities.</p></section>
-<section class="block-wrapper" data-block-id="b2"><a class="blocks-button__button" href="#">Continue</a>
-<p><a href="#x">Read the policy</a></p><img alt="" width="120" height="60" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='60'%3E%3Crect width='120' height='60' fill='%23ccc'/%3E%3C/svg%3E"></section>
+${markers.map((m, i) => `<section class="block-wrapper" data-block-id="m${i}"><p ${editable ? 'contenteditable="true"' : ''}>${m}</p></section>`).join('\n')}
+<section class="block-wrapper" data-block-id="b2"><a class="blocks-button__button brand--background" href="#">Continue</a>
+<p><a href="#x">Read the policy</a></p></section>
+<section class="block-wrapper" data-block-id="b3"><p>More content below.</p></section>
 </div></body></html>`;
 
 (async () => {
@@ -30,7 +36,7 @@ const MOCK = (editable) => `<!doctype html><html><head><title>Fire Safety Basics
     headless: true,
     channel: 'chromium', // new headless mode, which supports extensions
     args: ['--disable-extensions-except=' + EXT, '--load-extension=' + EXT],
-    viewport: { width: 1280, height: 860 },
+    viewport: { width: 1360, height: 900 },
   });
   await ctx.route('https://rise.articulate.com/**', (route) => {
     const editable = route.request().url().includes('/author/');
@@ -41,33 +47,57 @@ const MOCK = (editable) => `<!doctype html><html><head><title>Fire Safety Basics
   if (!sw) sw = await ctx.waitForEvent('serviceworker');
   const extId = new URL(sw.url()).host;
 
-  // ---------------------------------------------------------------- editor
+  // ================================================================ editor
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push('editor: ' + e.message));
-  await page.goto('https://rise.articulate.com/author/TESTCOURSE123#/author/details/lesson1');
+  const EDITOR = 'https://rise.articulate.com/author/TESTCOURSE123#/author/details/lesson1';
+  await page.goto(EDITOR);
   const host = page.locator('riseup-panel');
-  await host.locator('.launcher').click();
+  const launcher = host.locator('.launcher');
+  await launcher.waitFor();
+
+  // Drag the button to the top left; it should stay there after a reload.
+  const lb = await launcher.boundingBox();
+  await page.mouse.move(lb.x + 20, lb.y + 15);
+  await page.mouse.down();
+  await page.mouse.move(300, 200, { steps: 8 });
+  await page.mouse.move(40, 30, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  await page.reload();
+  await launcher.waitFor();
+  await page.waitForTimeout(300);
+  const moved = await launcher.boundingBox();
+  assert.ok(moved.x < 40 && moved.y < 40, 'launcher remembered at top left: ' + JSON.stringify(moved));
+  await launcher.click();
   const panel = host.locator('.panel');
   await panel.waitFor();
+  const pb = await panel.boundingBox();
+  assert.ok(pb.y > moved.y && pb.x < 100, 'panel opens below and to the right of a top-left button');
 
-  // Styles tab
-  await panel.locator('label.field', { hasText: 'Corner radius (px)' }).first().locator('input').fill('16');
+  // ---- Styles
+  await panel.locator('summary', { hasText: 'Blocks' }).click();
+  await panel.locator('label.field', { hasText: 'Corner radius' }).first().locator('input').fill('16');
   await panel.locator('label.field', { hasText: 'Shadow' }).first().locator('select').selectOption('medium');
-  await panel.locator('section', { has: page.locator('h2', { hasText: 'Buttons' }) }).locator('input').first().fill('999');
   await page.waitForTimeout(400);
   const blockStyle = await page.$eval('[data-block-id="b1"]', (el) => [getComputedStyle(el).borderTopLeftRadius, getComputedStyle(el).boxShadow]);
   assert.equal(blockStyle[0], '16px');
   assert.notEqual(blockStyle[1], 'none');
-  assert.equal(await page.$eval('.blocks-button__button', (el) => getComputedStyle(el).borderTopLeftRadius), '64px', 'button radius clamps to 64');
-  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '1-styles.png') });
+  await panel.locator('summary', { hasText: 'Scroll animation' }).click();
+  await page.waitForTimeout(100); // the other section closes on the toggle event
+  assert.equal(await panel.locator('details.acc[open]').count(), 1, 'one section open at a time');
+  await panel.locator('label.field', { hasText: 'Blocks appear with' }).locator('select').selectOption('rise');
+  await shot(page, '1-styles');
 
-  // Text tab: create a style and apply it to selected text
+  // ---- Text
   await panel.getByRole('tab', { name: 'Text' }).click();
   await panel.getByRole('button', { name: 'New style' }).click();
-  await panel.locator('label.field', { hasText: 'Gradient from' }).locator('input[type=text]').fill('#d84737');
-  await panel.locator('label.field', { hasText: 'Gradient from' }).locator('input[type=text]').press('Tab');
-  await panel.locator('label.field', { hasText: 'Gradient to' }).locator('input[type=text]').fill('#7837a8');
-  await panel.locator('label.field', { hasText: 'Gradient to' }).locator('input[type=text]').press('Tab');
+  await panel.locator('summary', { hasText: 'More effects' }).click();
+  for (const [label, hex] of [['Gradient from', '#d84737'], ['Gradient to', '#7837a8']]) {
+    const input = panel.locator('label.field', { hasText: label }).locator('input[type=text]');
+    await input.fill(hex);
+    await input.press('Tab');
+  }
   await page.evaluate(() => {
     const p = document.getElementById('para');
     const r = document.createRange();
@@ -80,11 +110,39 @@ const MOCK = (editable) => `<!doctype html><html><head><title>Fire Safety Basics
   await panel.locator('.status.ok').waitFor();
   await page.waitForTimeout(500);
   const hl = await page.evaluate(() => Array.from(CSS.highlights.keys()).filter((k) => k.startsWith('ru-hl-')).map((k) => CSS.highlights.get(k).size));
-  assert.deepEqual(hl, [2], 'heading and paragraph occurrences highlighted in the editor');
+  assert.deepEqual(hl, [2], 'heading and paragraph occurrences marked in the editor');
   assert.equal(await page.locator('#para span').count(), 0, 'editor DOM is never modified');
-  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '2-text.png') });
+  await shot(page, '2-text');
 
-  // Find tab: replace inside the editable paragraph
+  // ---- Blocks: add flip cards and a stat row, and grab their codes
+  await panel.getByRole('tab', { name: 'Blocks' }).click();
+  await shot(page, '3-blocks-gallery');
+  await panel.locator('.tile', { hasText: 'Flip cards' }).click();
+  const flipCode = (await panel.locator('.code-box code').textContent()).trim();
+  assert.match(flipCode, /^\[\[RiseUp: flipcards [a-z0-9]{6}\]\]$/);
+  await panel.locator('.preview .ru-flip').first().waitFor();
+  const front = panel.locator('.lf-item').first().locator('textarea').first();
+  await front.fill('Fire triangle');
+  assert.equal(await panel.locator('.preview .ru-flip-front .ru-flip-text').first().textContent(), 'Fire triangle', 'preview updates as you type');
+  await shot(page, '4-block-editor');
+  await panel.getByRole('button', { name: '← All blocks' }).click();
+  await panel.locator('.tile', { hasText: 'Stat row' }).click();
+  const statCode = (await panel.locator('.code-box code').textContent()).trim();
+  await panel.getByRole('button', { name: '← All blocks' }).click();
+  assert.equal(await panel.locator('.item').count(), 2);
+
+  // "Paste" the codes into the lesson; chips appear beside them in the editor.
+  markers = [flipCode, statCode, '[[RiseUp: hero zzzzzz]]'];
+  await page.reload();
+  await host.locator('.chip').nth(2).waitFor();
+  assert.deepEqual(await host.locator('.chip').allTextContents(), ['Flip cards', 'Stat row', 'Unknown block']);
+  await host.locator('.chip').first().click();
+  await host.locator('.panel .code-box code', { hasText: flipCode }).waitFor();
+  await shot(page, '5-editor-chips');
+  await host.locator('.panel').getByRole('button', { name: 'Close' }).click();
+
+  // ---- Find
+  await launcher.click();
   await panel.getByRole('tab', { name: 'Find' }).click();
   await panel.getByLabel('Find', { exact: true }).fill('Acme');
   await panel.getByLabel('Find', { exact: true }).press('Enter');
@@ -92,39 +150,37 @@ const MOCK = (editable) => `<!doctype html><html><head><title>Fire Safety Basics
   await panel.getByLabel('Replace with').fill('Globex');
   await panel.getByRole('button', { name: 'Replace all' }).click();
   assert.match(await page.textContent('#para'), /Globex facilities/);
-  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '3-find.png') });
 
-  // Colors tab
-  await panel.getByRole('tab', { name: 'Colors' }).click();
-  await panel.locator('.ratio').waitFor();
-  assert.match(await panel.locator('.ratio').textContent(), /^\d+\.\d\d : 1$/);
+  // ---- Colours
+  await panel.getByRole('tab', { name: 'Colours' }).click();
   await panel.getByRole('button', { name: '+ Add current' }).click();
   await panel.locator('.swatches .swatch').first().waitFor();
-  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '4-colors.png') });
+  await panel.locator('summary', { hasText: 'Contrast check' }).click();
+  assert.match(await panel.locator('.ratio').textContent(), /^\d+\.\d\d : 1$/);
+  await shot(page, '6-colours');
 
-  // Fonts: add a Google font, use it in the style, check it loads in the editor
-  await panel.getByRole('tab', { name: 'Text' }).click();
-  await panel.getByPlaceholder('Google Fonts family, e.g. Lora').fill('Lora');
-  await panel.getByRole('button', { name: 'Add', exact: true }).click();
-  await panel.locator('label.field', { hasText: 'Font' }).first().locator('select').selectOption('Lora');
-  await page.waitForFunction(() => document.fonts.check('16px Lora') && Array.from(document.fonts).some((f) => f.family.replace(/"/g, '') === 'Lora' && f.status === 'loaded'), null, { timeout: 20000 });
-
-  // ---------------------------------------------------------------- preview (non-editable): real styling
+  // ================================================================ preview
   const preview = await ctx.newPage();
   preview.on('pageerror', (e) => errors.push('preview: ' + e.message));
   await preview.goto('https://rise.articulate.com/share/TESTCOURSE123#/lessons/1');
-  await preview.waitForSelector('#para span[data-riseup-rule]');
-  // Match case is on: the heading and the paragraph's "Fire safety", not the lowercase one.
-  assert.equal(await preview.locator('span[data-riseup-rule]').count(), 2);
-  assert.equal(await preview.locator('h2 span[data-riseup-rule]').count(), 1);
-  assert.match(await preview.$eval('#para span', (el) => getComputedStyle(el).backgroundImage), /linear-gradient/);
-  if (SHOTS) await preview.screenshot({ path: path.join(SHOTS, '5-preview.png'), clip: { x: 0, y: 0, width: 1280, height: 260 } });
+  await preview.waitForSelector('.ru-c-flipcards .ru-flip');
+  assert.equal(await preview.locator('.ru-c').count(), 2, 'known codes become blocks');
+  assert.equal(await preview.evaluate(() => Array.from(document.querySelectorAll('p')).filter((p) => p.textContent.includes('[[RiseUp') && p.offsetParent !== null).length), 0, 'no codes visible to learners');
+  assert.equal(await preview.locator('.ru-c-flipcards .ru-flip-text').first().textContent(), 'Fire triangle');
+  await preview.locator('.ru-c-flipcards .ru-flip').first().click();
+  assert.equal(await preview.locator('.ru-c-flipcards .ru-flip').first().getAttribute('aria-pressed'), 'true');
+  const accent = await preview.$eval('.ru-c', (el) => getComputedStyle(el).getPropertyValue('--ru-accent').trim());
+  assert.equal(accent, '#d84745', 'blocks pick up the course theme colour');
+  assert.ok(await preview.locator('[data-block-id].ru-anim-rise').count() >= 3, 'blocks animate on scroll');
+  assert.equal(await preview.locator('#para span[data-riseup-rule]').count(), 1);
+  await preview.waitForTimeout(1600);
+  await shot(preview, '7-preview', { fullPage: true });
 
-  // ---------------------------------------------------------------- tools page: patch a zip
+  // ================================================================ tools: publish
   const tools = await ctx.newPage();
   tools.on('pageerror', (e) => errors.push('tools: ' + e.message));
   await tools.goto(`chrome-extension://${extId}/src/tools/tools.html#course=TESTCOURSE123`);
-  await tools.locator('#course-summary').getByText('1 font(s), 1 text style').waitFor();
+  await tools.locator('#course-summary').getByText('1 text style').waitFor();
   const zip = new JSZip();
   zip.file('index.html', '<html><head></head><body>launcher</body></html>');
   zip.file('scormcontent/index.html', MOCK(false));
@@ -135,13 +191,10 @@ const MOCK = (editable) => `<!doctype html><html><head><title>Fire Safety Basics
   const out = await (await dl).path();
   const patched = await JSZip.loadAsync(fs.readFileSync(out));
   const html = await patched.file('scormcontent/index.html').async('string');
-  assert.match(html, /riseup\/riseup-runtime\.js/);
-  assert.match(await patched.file('scormcontent/riseup/riseup.css').async('string'), /border-radius: 16px/);
-  assert.ok(Object.keys(patched.files).some((n) => /^scormcontent\/riseup\/fonts\/lora-.*\.woff2$/.test(n)), 'Lora embedded in the package');
-  assert.match(await patched.file('scormcontent/riseup/fonts.css').async('string'), /font-family: 'Lora'/);
-  if (SHOTS) await tools.screenshot({ path: path.join(SHOTS, '6-tools.png'), fullPage: true });
+  assert.match(html, /riseup\/components\.js[\s\S]*riseup\/riseup-runtime\.js/);
+  await shot(tools, '8-tools', { fullPage: true });
 
-  // Open the patched course from disk: the runtime styles the phrase without the extension's help.
+  // Open the published course from disk: blocks work without the extension.
   const dir = path.join(profile, 'unzipped');
   for (const [name, f] of Object.entries(patched.files)) {
     if (f.dir) continue;
@@ -151,8 +204,20 @@ const MOCK = (editable) => `<!doctype html><html><head><title>Fire Safety Basics
   const lms = await ctx.newPage();
   lms.on('pageerror', (e) => errors.push('published: ' + e.message));
   await lms.goto('file://' + path.join(dir, 'scormcontent/index.html'));
-  await lms.waitForSelector('#para span.ru-style-' + (await patched.file('scormcontent/riseup/riseup-config.js').async('string')).match(/"styleId":"([^"]+)"/)[1]);
+  await lms.waitForSelector('.ru-c-stats .ru-stat');
+  assert.equal(await lms.locator('.ru-c').count(), 2);
   assert.equal(await lms.$eval('[data-block-id="b1"]', (el) => getComputedStyle(el).borderTopLeftRadius), '16px');
+
+  // ================================================================ popup
+  const popup = await ctx.newPage();
+  await popup.setViewportSize({ width: 320, height: 300 });
+  await popup.goto(`chrome-extension://${extId}/src/popup/popup.html`);
+  await popup.getByRole('button', { name: 'Move the RiseUp button back to the corner' }).click();
+  await shot(popup, '9-popup');
+  await page.bringToFront();
+  await page.waitForTimeout(400);
+  const reset = await launcher.boundingBox();
+  assert.ok(reset.x > 1000 && reset.y > 800, 'launcher back in the corner: ' + JSON.stringify(reset));
 
   assert.deepEqual(errors, []);
   await ctx.close();

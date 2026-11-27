@@ -85,6 +85,7 @@
       const assets = {
         runtimeJs: await ownFile('src/runtime/riseup-runtime.js'),
         textRulesJs: await ownFile('src/shared/textRules.js'),
+        componentsJs: await ownFile('src/shared/components.js'),
       };
       if ($('embed-fonts').checked && cfg.fonts.length) {
         status('zip-status', 'Downloading fonts…');

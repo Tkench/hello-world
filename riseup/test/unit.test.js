@@ -196,3 +196,113 @@ test('parseFontFaceCss reads Google Fonts CSS', () => {
   assert.equal(faces[1].url, 'https://fonts.gstatic.com/s/lora/v1/b.woff2');
   assert.match(fontLoader.embeddedFontCss([{ ...faces[0], fileName: 'x.woff2' }]), /src: url\('fonts\/x\.woff2'\)/);
 });
+
+// ------------------------------------------------------------------ blocks
+const comps = require('../src/shared/components.js');
+
+test('marker codes are recognised in the forms authors may type', () => {
+  const ids = (s) => Array.from(s.matchAll(comps.MARKER_RE)).map((m) => m[1].toLowerCase());
+  assert.deepEqual(ids('[[RiseUp: flipcards k3x9q2]]'), ['k3x9q2']);
+  assert.deepEqual(ids('before [[riseup k3x9q2]] after [[ RiseUp:sort ab12cd ]]'), ['k3x9q2', 'ab12cd']);
+  assert.deepEqual(ids('[[Something else]] [RiseUp: x abcdef]'), []);
+  assert.equal(comps.markerFor({ type: 'hero', id: 'abc123' }), '[[RiseUp: hero abc123]]');
+});
+
+test('every block type renders its defaults without errors', () => {
+  const dom = new JSDOM('<!doctype html><body></body>', { pretendToBeVisual: true });
+  const doc = dom.window.document;
+  for (const [type, def] of Object.entries(comps.TYPES)) {
+    const node = comps.renderComponent(doc, { id: 'abc123', type, data: def.defaults() }, { courseKey: 't' });
+    assert.ok(node, type);
+    doc.body.appendChild(node);
+    assert.equal(node.getAttribute('data-riseup-component'), 'abc123');
+    assert.ok(def.fields.length && def.label && def.description, type + ' has a schema');
+  }
+  assert.equal(comps.renderComponent(doc, { id: 'x', type: 'nope' }), null);
+});
+
+test('author text is never parsed as HTML, and unsafe URLs are dropped', () => {
+  const dom = new JSDOM('<!doctype html><body></body>', { pretendToBeVisual: true });
+  const doc = dom.window.document;
+  const node = comps.renderComponent(doc, { id: 'q1', type: 'hero', data: { title: '<img src=x onerror=alert(1)>', buttonText: 'Go', buttonLink: 'javascript:alert(1)', image: 'javascript:x' } });
+  assert.equal(node.querySelector('img'), null);
+  assert.match(node.textContent, /<img src=x/);
+  assert.equal(node.querySelector('a'), null, 'unsafe link not rendered');
+  assert.equal(comps.safeUrl('https://example.com/a.png', 'image'), 'https://example.com/a.png');
+  assert.equal(comps.safeUrl('riseup/media/img-1.png', 'image'), 'riseup/media/img-1.png');
+  assert.equal(comps.safeUrl('data:text/html;base64,AAAA', 'image'), '');
+});
+
+test('flip cards flip and update aria state', () => {
+  const dom = new JSDOM('<!doctype html><body></body>', { pretendToBeVisual: true });
+  const doc = dom.window.document;
+  const node = comps.renderComponent(doc, { id: 'f1', type: 'flipcards', data: comps.TYPES.flipcards.defaults() });
+  doc.body.appendChild(node);
+  const btn = node.querySelector('.ru-flip');
+  btn.click();
+  assert.equal(btn.getAttribute('aria-pressed'), 'true');
+  assert.equal(node.querySelector('.ru-flip-back').getAttribute('aria-hidden'), 'false');
+});
+
+test('put-in-order starts shuffled, moves with buttons, and marks the answer', () => {
+  const dom = new JSDOM('<!doctype html><body></body>', { pretendToBeVisual: true });
+  const doc = dom.window.document;
+  const data = { question: 'Q', items: [{ text: 'A' }, { text: 'B' }, { text: 'C' }], correct: 'Yes', incorrect: 'No' };
+  const node = comps.renderComponent(doc, { id: 's1', type: 'sort', data });
+  doc.body.appendChild(node);
+  const order = () => Array.from(node.querySelectorAll('.ru-sort-text')).map((e) => e.textContent).join('');
+  assert.notEqual(order(), 'ABC');
+  // Bubble-sort into place using only the learner's "move up" buttons.
+  for (let pass = 0; pass < 3; pass++) {
+    for (let i = 1; i < 3; i++) {
+      const texts = order();
+      if (texts[i] < texts[i - 1]) node.querySelectorAll('.ru-sort-item')[i].querySelector('.ru-sort-mv').click();
+    }
+  }
+  assert.equal(order(), 'ABC');
+  Array.from(node.querySelectorAll('button')).find((b) => b.textContent === 'Check answer').click();
+  assert.equal(node.querySelector('.ru-feedback').textContent, 'Yes');
+  assert.equal(node.querySelectorAll('.ru-sort-item.is-right').length, 3);
+});
+
+test('reflection answers are saved on the device', () => {
+  const dom = new JSDOM('<!doctype html><body></body>', { pretendToBeVisual: true, url: 'https://lms.example/course/' });
+  const doc = dom.window.document;
+  const make = () => comps.renderComponent(doc, { id: 'r1', type: 'reflection', data: comps.TYPES.reflection.defaults() }, { courseKey: 'c' });
+  const a = make();
+  doc.body.appendChild(a);
+  a.querySelector('textarea').value = 'My answer';
+  Array.from(a.querySelectorAll('button')).find((b) => /Save/.test(b.textContent)).click();
+  assert.equal(make().querySelector('textarea').value, 'My answer');
+});
+
+test('themeCss picks readable text for the accent', () => {
+  assert.match(comps.themeCss({ accent: '#2b2b2b' }), /--ru-accent-ink: #ffffff/);
+  assert.match(comps.themeCss({ accent: '#ffa34a' }), /--ru-accent-ink: #14161c/);
+  assert.match(comps.themeCss({}), /--ru-accent: #2f6fde/);
+});
+
+test('packages turn uploaded images into files', () => {
+  const png = 'data:image/png;base64,iVBORw0KGgo=';
+  const { config, files } = pkg.externalizeMedia({ components: [
+    { id: 'a', type: 'hero', data: { image: png } },
+    { id: 'b', type: 'quote', data: { image: png, name: 'x' } },
+  ] });
+  assert.equal(files.length, 1, 'same image stored once');
+  assert.equal(files[0].name, 'media/img-1.png');
+  assert.equal(config.components[0].data.image, 'riseup/media/img-1.png');
+  assert.equal(config.components[1].data.image, 'riseup/media/img-1.png');
+});
+
+test('older saved settings gain the new block settings', () => {
+  const c = config.normalizeCourseConfig({ globalStyles: {}, textStyles: [] });
+  assert.deepEqual(c.components, []);
+  assert.equal(c.animation.type, 'none');
+  assert.equal(c.componentTheme.radius, 12);
+  assert.equal(config.normalizeCourseConfig({ animation: { type: 'rise' } }).animation.duration, 700);
+});
+
+test('large text on mid-tone accents stays white', () => {
+  assert.match(comps.themeCss({ accent: '#2b94e5' }), /--ru-accent-ink-large: #ffffff/);
+  assert.match(comps.themeCss({ accent: '#ffa34a' }), /--ru-accent-ink-large: #14161c/);
+});
